@@ -1,0 +1,981 @@
+Modular Interpreted Systems
+Wojciech Jamroga
+Department of Informatics
+Clausthal University of Technology, Germany
+wjamroga@in.tu-clausthal.de
+Thomas Ågotnes
+Department of Computer Engineering
+Bergen University College, Norway
+tag@hib.no
+ABSTRACT
+We propose a new class of representations that can be used for 
+modeling (and model checking) temporal, strategic and epistemic 
+properties of agents and their teams. Our representations borrow the
+main ideas from interpreted systems of Halpern, Fagin et al.; 
+however, they are also modular and compact in the way concurrent 
+programs are. We also mention preliminary results on model checking
+alternating-time temporal logic for this natural class of models.
+Categories and Subject Descriptors
+I.2.11 [Artificial Intelligence]: Distributed Artificial 
+IntelligenceMultiagent Systems; I.2.4 [Artificial Intelligence]: Knowledge 
+Representation Formalisms and Methods-Modal logic
+General Terms
+Theory
+1. INTRODUCTION
+The logical foundations of multi-agent systems have received
+much attention in recent years. Logic has been used to represent
+and reason about, e.g., knowledge [7], time [6], cooperation and
+strategic ability [3]. Lately, an increasing amount of research has
+focused on higher level representation languages for models of such
+logics, motivated mainly by the need for compact representations,
+and for representations that correspond more closely to the actual
+systems which are modeled. Multi-agent systems are open systems,
+in the sense that agents interact with an environment only partially
+known in advance. Thus, we need representations of models of
+multi-agent systems which are modular, in the sense that a 
+component, such as an agent, can be replaced, removed, or added, without
+major changes to the representation of the whole model. However,
+as we argue in this paper, few existing representation languages are
+both modular, compact and computationally grounded on the one
+hand, and allow for representing properties of both knowledge and
+strategic ability, on the other.
+In this paper we present a new class of representations for 
+models of open multi-agent systems, which are modular, compact and
+come with an implicit methodology for modeling and designing
+actual systems.
+The structure of the paper is as follows. First, in Section 2, we
+present the background of our work - that is, logics that combine
+time, knowledge, and strategies. More precisely: modal logics that
+combine branching time, knowledge, and strategies under 
+incomplete information. We start with computation tree logic CTL, then
+we add knowledge (CTLK), and then we discuss two variants of
+alternating-time temporal logic (ATL): one for the perfect, and one
+for the imperfect information case. The semantics of logics like the
+ones presented in Section 2 are usually defined over explicit models
+(Kripke structures) that enumerate all possible (global) states of the
+system. However, enumerating these states is one of the things one
+mostly wants to avoid, because there are too many of them even
+for simple systems. Thus, we usually need representations that are
+more compact. Another reason for using a more specialized class of
+models is that general Kripke structures do not always give enough
+help in terms of methodology, both at the stage of design, nor at 
+implementation. This calls for a semantics which is more grounded, in
+the sense that the correspondence between elements of the model,
+and the entities that are modeled, is more immediate. In Section 3,
+we present an overview of representations that have been used for
+modeling and model checking systems in which time, action (and
+possibly knowledge) are important; we mention especially 
+representations used for theoretical analysis. We point out that the 
+compact and/or grounded representations of temporal models do not
+play their role in a satisfactory way when agents" strategies are
+considered. Finally, in Section 4, we present our framework of
+modular interpreted systems (MIS), and show where it fits in the
+picture. We conclude with a somewhat surprising hypothesis, that
+model checking ability under imperfect information for MIS can be
+computationally cheaper than model checking perfect information.
+Until now, almost all complexity results were distinctly in favor of
+perfect information strategies (and the others were indifferent).
+2. LOGICS OF TIME, KNOWLEDGE, AND
+STRATEGIC ABILITY
+First, we present the logics CTL, CTLK, ATL and ATLir that are
+the starting point of our study.
+2.1 Branching Time: CTL
+Computation tree logic CTL [6] includes operators for temporal
+properties of systems: i.e., path quantifier E (there is a path), 
+together with temporal operators: f(in the next state), 2 (always
+from now on) and U (until).1
+Every occurrence of a temporal
+operator is immediately preceded by exactly one path quantifier
+(this variant of the language is sometimes called vanilla CTL).
+Let Π be a set of atomic propositions with a typical element p.
+CTL formulae ϕ are defined as follows:
+ϕ ::= p | ¬ϕ | ϕ ∧ ϕ | E fϕ | E2ϕ | Eϕ U ϕ.
+The semantics of CTL is based on Kripke models M = St, R, π ,
+which include a nonempty set of states St, a state transition relation
+R ⊆ St × St, and a valuation of propositions π : Π → P(St).
+A path λ in M refers to a possible behavior (or computation) of
+system M, and can be represented as an infinite sequence of states
+q0q1q2... such that qiRqi+1 for every i = 0, 1, 2, .... We denote
+the ith state in λ by λ[i]. A q-path is a path that starts in q. 
+Interpretation of a formula in a state q in model M is defined as follows:
+M, q |= p iff q ∈ π(p);
+M, q |= ¬ϕ iff M, q |= ϕ;
+M, q |= ϕ ∧ ψ iff M, q |= ϕ and M, q |= ψ;
+M, q |= E fϕ iff there is a q-path λ such that M, λ[1] |= ϕ;
+M, q |= E2ϕ iff there is a q-path λ such that M, λ[i] |= ϕ for
+every i ≥ 0;
+M, q |= Eϕ U ψ iff there is a q-path λ and i ≥ 0 such that
+M, λ[i] |= ψ and M, λ[j] |= ϕ for every 0 ≤ j < i.
+2.2 Adding Knowledge: CTLK
+CTLK [19] is a straightforward combination of CTL and standard
+epistemic logic [10, 7]. Let Agt = {1, ..., k} be a set of agents with
+a typical element a. Epistemic logic uses operators for representing
+agents" knowledge: Kaϕ is read as agent a knows that ϕ. Models
+of CTLK extend models of CTL with epistemic indistinguishability
+relations ∼a⊆ St × St (one per agent). We assume that all ∼a are
+equivalences. The semantics of epistemic operators is defined as
+follows:
+M, q |= Kaϕ iff M, q |= ϕ for every q such that q ∼a q .
+Note that, when talking about agents" knowledge, we 
+implicitly assume that agents may have imperfect information about the
+actual current state of the world (otherwise the notion of 
+knowledge would be trivial). This does not have influence on the way
+we model evolution of a system as a single unit, but it will become
+important when particular agents and their strategies come to the
+fore.
+2.3 Agents and Their Strategies: ATL
+Alternating-time temporal logic ATL [3] is a logic for 
+reasoning about temporal and strategic properties of open computational
+systems (multi-agent systems in particular). The language of ATL
+consists of the following formulae:
+ϕ ::= p | ¬ϕ | ϕ ∧ ϕ | A fϕ | A 2ϕ | A ϕ U ϕ.
+where A ⊆ Agt. Informally, A ϕ says that agents A have a 
+collective strategy to enforce ϕ. It should be noted that the CTL path
+quantifiers A, E can be expressed with ∅ , Agt respectively.
+The semantics of ATL is defined in so called concurrent game
+structures (CGSs). A CGS is a tuple
+M = Agt, St, Act, d, o, Π, π ,
+1
+Additional operators A (for every path) and 3 (sometime in
+the future) are defined in the usual way.
+consisting of: a set Agt = {1, . . . , k} of agents; set St of states;
+valuation of propositions π : Π → P(St); set Act of atomic 
+actions. Function d : Agt × St → P(Act) indicates the actions
+available to agent a ∈ Agt in state q ∈ St. Finally, o is a 
+deterministic transition function which maps a state q ∈ St and an
+action profile α1, . . . , αk ∈ Actk
+, αi ∈ d(i, q), to another state
+q = o(q, α1, . . . , αk).
+DEFINITION 1. A (memoryless) strategy of agent a is a function
+sa : St → Act such that sa(q) ∈ d(a, q).2
+A collective strategy SA
+for a team A ⊆ Agt specifies an individual strategy for each agent
+a ∈ A. Finally, the outcome of strategy SA in state q is defined as
+the set of all computations that may result from executing SA from
+q on:
+out(q, SA) = {λ = q0q1q2... | q0 = q and for every i = 1, 2, ...
+there exists αi−1
+1 , ..., αi−1
+k such that αi−1
+a = SA(a)(qi−1)
+for each a ∈ A, αi−1
+a ∈ d(a, qi−1) for each a /∈ A, and
+o(qi−1, αi−1
+1 , ..., αi−1
+k ) = qi}.
+The semantics of cooperation modalities is as follows:
+M, q |= A fϕ iff there is a collective strategy SA such that,
+for every λ ∈ out(q, SA), we have M, λ[1] |= ϕ;
+M, q |= A 2ϕ iff there exists SA such that, for every λ ∈
+out(q, SA), we have M, λ[i] for every i ≥ 0;
+M, q |= A ϕ U ψ iff there exists SA such that for every λ ∈
+out(q, SA) there is a i ≥ 0, for which M, λ[i] |= ψ, and
+M, λ[j] |= ϕ for every 0 ≤ j < i.
+2.4 Agents with Imperfect Information: ATLir
+As ATL does not include incomplete information in its scope, it
+can be seen as a logic for reasoning about agents who always have
+complete knowledge about the current state of the whole system.
+ATLir [21] includes the same formulae as ATL, except that the 
+cooperation modalities are presented with a subscript: A ir indicates
+that they address agents with imperfect information and imperfect
+recall. Formally, the recursive definition of ATLir formulae is:
+ϕ ::= p | ¬ϕ | ϕ ∧ ϕ | A ir
+fϕ | A ir2ϕ | A irϕ U ϕ
+Models of ATLir, concurrent epistemic game structures (CEGS),
+can be defined as tuples M = Agt, St, Act, d, o, ∼1, ..., ∼k, Π, π ,
+where Agt, St, Act, d, o, Π, π is a CGS, and ∼1, ..., ∼k are 
+epistemic (equivalence) relations. It is required that agents have the
+same choices in indistinguishable states: q ∼a q implies d(a, q) =
+d(a, q ). ATLir restricts the strategies that can be used by agents
+to uniform strategies, i.e. functions sa : St → Act, such that: (1)
+sa(q) ∈ d(a, q), and (2) if q ∼a q then sa(q) = sa(q ). A collective
+strategy is uniform if it contains only uniform individual strategies.
+Again, the function out(q, SA) returns the set of all paths that may
+result from agents A executing collective strategy SA from state q.
+The semantics of ATLir formulae can be defined as follows:
+M, q |= A ir
+fϕ iff there is a uniform collective strategy SA
+such that, for every a ∈ A, q such that q ∼a q , and λ ∈
+out(SA, q ), we have M, λ[1] |= ϕ;
+2
+This is a deviation from the original semantics of ATL [3], where
+strategies assign agents" choices to sequences of states, which 
+suggests that agents can by definition recall the whole history of each
+game. While the choice of one or another notion of strategy affects
+the semantics of the full ATL
+∗
+, and most ATL extensions (e.g. for
+games with imperfect information), it should be pointed out that
+both types of strategies yield equivalent semantics for pure ATL
+(cf. [21]).
+898 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+M, q |= A ir2ϕ iff there exists SA such that, for every a ∈ A,
+q such that q ∼a q , and λ ∈ out(SA, q ), we have M, λ[i]
+for every i ≥ 0;
+M, q |= A irϕ U ψ iff there exist SA such that, for every a ∈ A,
+q such that q ∼a q , and λ ∈ out(SA, q ), there is i ≥ 0 for
+which M, λ[i] |= ψ, and M, λ[j] |= ϕ for every 0 ≤ j < i.
+That is, A irϕ holds iff A have a uniform collective strategy, such
+that for every path that can possibly result from execution of the
+strategy according to at least one agent from A, ϕ is the case.
+3. MODELS AND MODEL CHECKING
+In this section, we present and discuss various (existing) 
+representations of systems that can be used for modeling and model
+checking. We believe that the two most important points of 
+reference are in this case: (1) the modeling formalism (i.e., the logic
+and the semantics we use), and (2) the phenomenon, or more 
+generally, the domain we are going to model (to which we will often
+refer as the real world). Our aim is a representation which is 
+reasonably close to the real world (i.e., it is sufficiently compact and
+grounded), and still not too far away from the formalism (so that
+it e.g. easily allows for theoretical analysis of computational 
+problems). We begin with discussing the merits of explicit 
+modelsin our case, these are transition systems, concurrent game structures
+and CEGSs, presented in the previous section.
+3.1 Explicit Models
+Obviously, an advantage of explicit models is that they are very
+close to the semantics of our logics (simply because they are the
+semantics). On the other hand, they are in many ways difficult to
+use to describe an actual system:
+• Exponential size: temporal models usually have an 
+exponential number of states with respect to any higher-level 
+description (e.g. Boolean variables, n-ary attributes etc.). Also, their
+size is exponential in the number of processes (or agents)
+if the evolution of a system results from joint (synchronous
+or asynchronous) actions of several active entities [15]. For
+CGSs the situation is even worse: here, also the number of
+transitions is exponential, even if we fix the number of states.3
+In practice, this means that such representations are very 
+seldom scalable.
+• Explicit models include no modularity. States in a model
+refer to global states of the system; transitions in the model
+correspond to global transitions as well, i.e., they represent
+(in an atomic way) everything that may happen in one single
+step, regardless of who has done it, to whom, and in what
+way.
+• Logics like ATL are often advertised as frameworks for 
+modeling and reasoning about open computational systems. 
+Ideally, one would like the elements of such a system to have
+as little interdependencies as possible, so that they can be
+plugged in and out without much hassle, for instance when
+we want to test various designs or implementations of the
+active component. In the case of a multi-agent system the
+3
+Another class of ATL models, alternating transition systems [2]
+represent transitions in a more succinct way. While we still have
+exponentially many states in an ATS, the number of transitions is
+simply quadratic wrt. to states (like for CTL models). 
+Unfortunately, ATS are even less modular and harder to design than 
+concurrent game structures, and they cannot be easily extended to handle
+incomplete information (cf. [9]).
+need is perhaps even more obvious. We do not only need
+to re-plug various designs of a single agent in the overall
+architecture; we usually also need to change (e.g., increase)
+the number of agents acting in a given environment without
+necessarily changing the design of the whole system. 
+Unfortunately, ATL models are anything but open in this sense.
+Theoretical complexity results for explicit models are as follows.
+Model checking CTL and CTLK is P-complete, and can be done in
+time O(ml), where m is the number of transitions in the model,
+and l is the length of the formula [5]. Alternatively, it can be done
+in time O(n2
+l), where n is the number of states. Model checking
+ATL is P-complete wrt. m, l and ΔP
+3 -complete wrt. n, k, l (k being
+the number of agents) [3, 12, 16]. Model checking ATLir is ΔP
+
+2complete wrt. m, l and ΔP
+3 -complete wrt. n, k, l [21, 13].
+3.2 Compressed Representations
+Explicit representation of all states and transitions is inefficient
+in many ways. An alternative is to represent the state/transition
+space in a symbolic way [17, 18].
+Such models offer some hope for feasible model checking 
+properties of open/multi-agent systems, although it is well known that
+they are compact only in a fraction of all cases.4
+For us, however,
+they are insufficient for another reason: they are merely optimized
+representations of explicit models. Thus, they are neither more
+open nor better grounded: they were meant to optimize 
+implementation rather than facilitate design or modeling methodology.
+3.3 Interpreted Systems
+Interpreted systems [11, 7] are held by many as a prime example
+of computationally grounded models of distributed systems. An 
+interpreted system can be defined as a tuple IS = St1, ..., Stk, Stenv, R, π .
+St1, ..., Stk are local state spaces of agents 1, ..., k, and Stenv is the
+set of states of the environment. The set of global states is defined
+as St = St1 × ... × Stk × Stenv; R ⊆ St × St is a transition relation,
+and π : Π → P(St). While the transition relation encapsulates
+the (possible) evolution of the system over time, the epistemic 
+dimension is defined by the local components of each global state:
+q1, ..., qk, qenv ∼i q1, ..., qk, qenv iff qi = qi .
+It is easy to see that such a representation is modular and 
+compact as far as we are concerned with states. Moreover, it gives a
+natural (grounded) approach to knowledge, and suggests an 
+intuitive methodology for modeling epistemic states. Unfortunately,
+the way transitions are represented in interpreted systems is neither
+compact, nor modular, nor grounded: the temporal aspect of the
+system is given by a joint transition function, exactly like in 
+explicit models. This is not without a reason: if we separate activities
+of the agents too much, we cannot model interaction in the 
+framework any more, and interaction is the most interesting thing here.
+But the bottom line is that the temporal dimension of an interpreted
+system has exponential representation. And it is almost as difficult
+to plug components in and out of an interpreted system, as for an
+ordinary CTL or ATL model, since the local activity of an agent is
+completely merged with his interaction with the rest of the system.
+3.4 Concurrent Programs
+The idea of concurrent programs has been long known in the
+literature on distributed systems. Here, we use the formulation
+from [15]. A concurrent program P is composed of k 
+concurrent processes, each described by a labeled transition system Pi =
+Sti, Acti, Ri, Πi, πi , where Sti is the set of local states of process
+4
+Representation R of an explicit model M is compact if the size of
+R is logarithmic with respect to the size of M.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 899
+i, Acti is the set of local actions, Ri ⊆ Sti ×Acti ×Sti is a transition
+relation, and Πi, πi are the set of local propositions and their 
+valuation. The behavior of program P is given by the product 
+automaton of P1, ..., Pk under the assumption that processes work 
+asynchronously, actions are interleaved, and synchronization is obtained
+through common action names.
+Concurrent programs have several advantages. First of all, they
+are modular and compact. They allow for local modeling of 
+components - much more so than interpreted systems (not only states,
+but also actions are local here). Moreover, they allow for 
+representing explicit interaction between local transitions of reactive 
+processes, like willful communication, and synchronization. On the
+other hand, they do not allow for representing implicit, 
+incidental, or not entirely benevolent interaction between processes. For
+example, if we want to represent the act of pushing somebody, the
+pushed object must explicitly execute an action of being pushed,
+which seems somewhat ridiculous. Side effects of actions are also
+not easy to model. Still, this is a minor complaint in the context
+of CTL, because for temporal logics we are only interested in the
+flow of transitions, and not in the underlying actions. For temporal
+reasoning about k asynchronous processes with no implicit 
+interaction, concurrent programs seem just about perfect.
+The situation is different when we talk about autonomous, 
+proactive components (like agents), acting together (cooperatively or
+adversely) in a common environment - and we want to address
+their strategies and abilities. Now, particular actions are no less 
+important than the resulting transitions. Actions may influence other
+agents" local states without their consent, they may have side 
+effects on other agents" states etc. Passing messages and/or calling
+procedures is by no means the only way of interaction between
+agents. Moreover, the availability of actions (to an agent) should
+not depend on the actions that will be executed by other agents at
+the same time - these are the outcome states that may depend on
+these actions! Finally, we would often like to assume that agents act
+synchronously. In particular, all agents play simultaneously in 
+concurrent game structures. But, assuming synchrony and autonomy
+of actions, synchronization can no longer be a means of 
+coordination.
+To sum up, we need a representation which is very much like
+concurrent programs, but allows for modeling agents that play 
+synchronously, and which enables modeling more sophisticated 
+interaction between agents" actions. The first postulate is easy to satisfy,
+as we show in the following section. The second will be addressed
+in Section 4.
+We note that model checking CTL against concurrent programs
+is PSPACE-complete in the number of local states and the length
+of the formula [15].
+3.5 Synchronous CP and Simple Reactive 
+Modules
+The semantics of ATL is based on synchronous models where
+availability of actions does not depend on the actions currently 
+executed by the other players. A slightly different variant of 
+concurrent programs can be defined via synchronous product of programs,
+so that all agents play simultaneously.5
+Unfortunately, under such
+interpretation, no direct interaction between agents" actions can be
+modeled at all.
+DEFINITION 2. A synchronous concurrent program consists of
+k concurrent processes Pi = Sti, Acti, Ri, Πi, πi with the 
+follow5
+The concept is not new, of course, and has already existed in folk
+knowledge, although we failed to find an explicit definition in the
+literature.
+ing unfolding to a CGS: Agt = {1, ..., k}, St =
+Qk
+i=1 Sti, Act =
+Sk
+i=1 Acti, d(i, q1, ..., qk ) = {αi | qi, αi, qi ∈ Ri for some qi ∈
+Sti}, o( q1, ..., qk , α1, ..., αk) = q1, ..., qk such that qi, αi, qi ∈
+Ri for every i; Π =
+Sk
+i=1 Πi, and π(p) = πi(p) for p ∈ Πi.
+We note that the simple reactive modules (SRML) from [22] can
+be seen as a particular implementation of synchronous concurrent
+programs.
+DEFINITION 3. A SRML system is a tuple Σ, Π, m1, . . . , mk ,
+where Σ = {1, . . . , k} is a set of modules (or agents), Π is a
+set of Boolean variables, and, for each i ∈ Σ, we have mi =
+ctri, initi, updatei , where ctri ⊆ Π. Sets initi and updatei consist
+of guarded commands of the form φ ; v1 := ψ1; . . . ; vk := ψk,
+where every vj ∈ ctri, and φ, ψ1, . . . , ψk are propositional 
+formulae over Π. It is required that ctr1, . . . ctrk partitions Π.
+The idea is that agent i controls the variables ctri. The init guarded
+commands are used to initialize the controlled variables, while the
+update guarded commands can change their values in each round.
+A guarded command is enabled if the guard φ is true in the current
+state of the system. In each round an enabled update guarded 
+command is executed: each ψj is evaluated against the current state of
+the system, and its logical value is assigned to vj. Several guarded
+commands being enabled at the same time model non-deterministic
+choice. Model checking ATL for SRML has been proved 
+EXPTIMEcomplete in the size of the model and the length of the formula [22].
+3.6 Concurrent Epistemic Programs
+Concurrent programs (both asynchronous and synchronous) can
+be used to encode epistemic relations too - exactly in the same
+way as interpreted systems do [20]. That is, when unfolding a
+concurrent program to a model of CTLK or ATLir, we define that
+q1, ..., qk ∼i q1, ..., qk iff qi = qi . Model checking CTLK
+against concurrent epistemic programs is PSPACE-complete [20].
+SRML can be also interpreted in the same way; then, we would
+assume that every agent can see only the variables he controls.
+Concurrent epistemic programs are modular and have a grounded
+semantics. They are usually compact (albeit not always: for 
+example, an agent with perfect information will always blow up the size
+of such a program). Still, they inherit all the problems of 
+concurrent programs with perfect information, discussed in Section 3.4:
+limited interaction between components, availability of local 
+actions depending on the actual transition etc. The problems were
+already important for agents with perfect information, but they 
+become even more crucial when agents have only limited knowledge
+of the current situation. One of the most important applications of
+logics that combine strategic and epistemic properties is 
+verification of communication protocols (e.g., in the context of security).
+Now, we may want to, e.g., check agents" ability to pass an 
+information between them, without letting anybody else intercept the
+message. The point is that the action of intercepting is by definition
+enabled; we just look for a protocol in which the transition of 
+successful interception is never carried out. So, availability of actions
+must be independent of the actions chosen by the other agents under
+incomplete information. On the other hand, interaction is arguably
+the most interesting feature of multi-agent systems, and it is really
+hard to imagine models of strategic-epistemic logics, in which it is
+not possible to represent communication.
+3.7 Reactive Modules
+Reactive modules [1] can be seen as a refinement of 
+concurrent epistemic programs (primarily used by the MOCHA model
+checker [4]), but they are much more powerful, expressive and
+900 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+grounded. We have already mentioned a very limited variant of
+RML (i.e., SRML). The vocabulary of RML is very close to 
+implementations (in terms of general computational systems): the 
+modules are essentially collections of variables, states are just 
+valuations of variables; events/actions are variable updates. However,
+the sets of variables controlled by different agents can overlap,
+they can change over time etc. Moreover, reactive modules 
+support incomplete information (through observability of variables),
+although it is not the main focus of RML. Again, the relationship
+between sets of observable variables (and to sets of controlled 
+variables) is mostly left up to the designer of a system. Agents can act
+synchronously as well as asynchronously.
+To sum up, RML define a powerful framework for modeling 
+distributed systems with various kinds of synchrony and asynchrony.
+However, we believe that there is still a need for a simpler and
+slightly more abstract class of representations. First, the 
+framework of RML is technically complicated, involving a number 
+auxiliary concepts and their definitions. Second, it is not always 
+convenient to represent all that is going on in a multi-agent system
+as reading and/or writing from/to program variables. This view
+of a multi-agent system is arguably close to its computer 
+implementation, but usually rather distant from the real world 
+domainhence the need for a more abstract, and more conceptually flexible
+framework. Third, the separation of the local complexity, and the
+complexity of interaction is not straightforward. Our new proposal,
+more in the spirit of interpreted systems, takes these observations
+as the starting point. The proposed framework is presented in 
+Section 4.
+4. MODULAR INTERPRETED SYSTEMS
+The idea behind distributed systems (multi-agent systems even
+more so) is that we deal with several loosely coupled components,
+where most of the processing goes on inside components (i.e., 
+locally), and only a small fraction of the processing occurs between
+the components. Interaction is crucial (which makes concurrent
+programs an insufficient modeling tool), but it usually consumes
+much less of the agent"s resources than local computations (which
+makes the explicit transition tables of CGS, CEGS, and interpreted
+systems an overkill). Modular interpreted systems, proposed here,
+extrapolate the modeling idea behind interpreted systems in a way
+that allows for a tight control of the interaction complexity.
+DEFINITION 4. A modular interpreted system (MIS) is defined
+as a tuple
+S = Agt, env, Act, In ,
+where Agt = {a1, ..., ak} is a set of agents, env is the environment,
+Act is a set of actions, and In is a set of symbols called interaction
+alphabet. Each agent has the following internal structure:
+ai = Sti, di, outi, ini, oi, Πi, πi , where:
+• Sti is a set of local states,
+• di : Sti → P(Act) defines local availability of actions; for
+convenience of the notation, we additionally define the set of
+situated actions as Di = { qi, α | qi ∈ Sti, α ∈ di(qi)},
+• outi, ini are interaction functions; outi : Di → In refers to
+the influence that a given situated action (of agent ai) may
+possibly have on the external world, and ini : Sti ×Ink
+→ In
+translates external manifestations of the other agents (and
+the environment) into the impression that they make on
+ai"s transition function depending on the local state of ai,
+• oi : Di × In → Sti is a (deterministic) local transition 
+function,
+• Πi is a set of local propositions of agent ai where we require
+that Πi and Πj are disjunct when i = j, and
+• πi : Πi → P(Sti) is a valuation of these propositions.
+The environment env = Stenv, outenv, inenv, oenv, Πenv, πenv has the
+same structure as an agent except that it does not perform actions,
+and that thus outenv : Stenv → In and oenv : Stenv × In → Stenv.
+Within our framework, we assume that every action is executed
+by an actor, that is, an agent. As a consequence, every actor is
+explicitly represented in a MIS as an agent, just like in the case of
+CGS and CEGS. The environment, on the other hand, represents the
+(passive) context of agents" actions. In practice, it serves to capture
+the aspects of the global state that are not observable by any of the
+agents.
+The input functions ini seem to be the fragile spots here: when
+given explicitly as tables, they have size exponential wrt. the 
+number of agents (and linear wrt. the size of In). However, we can
+use, e.g., a construction similar to the one from [16] to represent
+interaction functions more compactly.
+DEFINITION 5. Implicit input function for state q ∈ Sti is given
+by a sequence ϕ1, η1 , ..., ϕn, ηn , where each ηj ∈ In is an 
+interaction symbol, and each ϕj is a boolean combination of 
+propositions ˆηi
+, with η ∈ In; ˆηi
+stands for η is the symbol currently
+generated by agent i. The input function is now defined as 
+follows: ini(q, 1, ..., k, env) = ηj iff j is the lowest index such that
+{ˆ1
+1, ..., ˆk
+k, ˆenv
+env} |= ϕj. It is required that ϕn ≡ , so that the 
+mapping is effective.
+REMARK 1. Every ini can be encoded as an implicit input 
+function, with each ϕj being of polynomial size with respect to the 
+number of interaction symbols (cf. [16]).
+Note that, for some domains, the MIS representation of a system
+requires exponentially many symbols in the interaction alphabet In.
+In such a case, the problem is inherent to the domain, and ini will
+have size exponential wrt the number of agents.
+4.1 Representing Agent Systems with MIS
+Let Stg = (
+Qk
+i=1 Sti)×Stenv be the set of all possible global states
+generated by a modular interpreted system S.
+DEFINITION 6. The unfolding of a MIS S for initial states Q ⊆
+Stg to a CEGS cegs(S, Q) = Agt , St , Π , π , Act , d , o , ∼1, ..., ∼k
+is defined as follows:
+• Agt = {1, ..., k} and Act = Act,
+• St is the set of global states from Stg which are reachable
+from some state in Q via the transition relation defined by o
+(below),
+• Π =
+Sk
+i=1 Πi ∪ Πenv,
+• For each q = q1, . . . , qk, qenv ∈ St and i = 1, ..., k, env,
+we define q ∈ π (p) iff p ∈ Πi and qi ∈ πi(p),
+• d (i, q) = di(qi) for global state q = q1, ..., qk, qenv ,
+• The transition function is constructed as follows. Let q =
+q1, ..., qk, qenv ∈ St , and α = α1, ..., αk be an action
+profile s.t. αi ∈ d (i, q). We define inputi(q, α) =
+ini
+`
+qi, out1(q1, α1), . . . , outi−1(qi−1, αi−1), outi+1(qi+1, αi+1),
+. . . , outk(qk, αk), outenv(qenv)
+´
+for each agent i = 1, . . . , k,
+and inputenv(q, α) = inenv
+`
+qenv, out1(q1, α1), . . . , outk(qk, αk)
+´
+.
+Then, o (q, α) = o1( q1, α1 , input1(q, α)), . . . ,
+ok( qk, αk , inputk(q, α)), oenv(qenv, inputenv(q, α)) ;
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 901
+• For each i = 1, ..., k: q1, ..., qk, qenv ∼i q1, ..., qk, qenv iff
+qi = qi .6
+REMARK 2. Note that MISs can be used as representations of
+CGSs too. In that case, epistemic relations ∼i are simply omitted in
+the unfolding. We denote the unfolding of a MIS S for initial states
+Q into a CGS by cgs(S, Q).
+Propositions 3 and 5 state that modular interpreted systems can
+be used as representations for explicit models of multi-agent 
+systems. On the other hand, these representations are not always 
+compact, as demonstrated by Propositions 7 and 8.
+PROPOSITION 3. For every CEGS M, there is a MIS SM
+and a
+set of global states Q of SM
+such that cegs(SM
+, Q) is isomorphic to
+M.7
+PROOF. Let M = {1, . . . , k}, St, Act, d, o, Π, π, ∼1, . . . , ∼k
+be a CEGS. We construct a MIS SM
+= {a1, . . . , ak}, env, Act, In
+with agents ai = Sti, di, outi, ini, oi, Πi, πi and environment env =
+Stenv, outenv, inenv, oenv, Πenv, πenv , plus a set Q ⊆ Stg of global
+states, as follows.
+• In = Act ∪ St ∪ (Actk−1
+× St),
+• Sti = {[q]∼i | q ∈ St} for 1 ≤ i ≤ k (i.e., Sti is the set of i"s
+indistinguishability classes in M),
+• Stenv = St,
+• di([q]∼i ) = d(i, q) for 1 ≤ i ≤ k (this is well-defined since
+d(i, q) = d(i, q ) whenever q ∼i q ),
+• outi([q]∼i , αi) = αi for 1 ≤ i ≤ k; outenv(q) = q,
+• ini([q]∼i , α1, . . . , αi−1, αi+1, . . . , αk, qenv) =
+α1, . . . , αi−1, αi+1, . . . , αk, qenv for i ∈ {1, . . . , k};
+inenv(q, α1 . . . , αk) = α1, . . . , αk ;
+ini(x) and inenv(x) are arbitrary for other arguments x,
+• oi( [q]∼i , αi , α1, . . . , αi−1, αi+1, . . . , αk, qenv ) =
+[o(qenv, α1, . . . , αk)]∼i for 1 ≤ i ≤ k and αi ∈ di([q]∼i );
+oenv(q, α1, . . . , αk ) = o(q, α1, . . . , αk);
+oi and oenv are arbitrary for other arguments,
+• Πi = ∅ for 1 ≤ i ≤ k, and Πenv = Π,
+• πenv(p) = π(p)
+• Q = { [q]∼1 , . . . , [q]∼k , q : q ∈ St}
+Let M = cegs(SM
+, Q) = Agt , St , Act , d , o , Π , π , ∼1, . . . , ∼k .
+We argue that M and M are isomorphic by establishing a 
+oneto-one correspondence between the respective sets of states, and
+showing that the other parts of the structures agree on 
+corresponding states.
+First we show that, for any ˆq = [q ]∼1 , . . . , [q ]∼k , q ∈ Q
+and any α = α1, . . . , αk such that αi ∈ d (i, ˆq ), we have
+o (ˆq , α) = [q]∼1 , . . . , [q]∼k , q where q = o(q , α) (1)
+Let ˆq = o (ˆq , α). Now, for any i: inputi(ˆq , α) = ini([q ]∼i ,
+out1([q ]∼1 , α1), ..., outi−1([q ]∼i−1 , αi−1), outi+1([q ]∼i+1 , αi+1),
+. . . , outk([q ]∼k , αk), outenv(q )) = ini([q ]∼i , α1, . . . , αi−1, αi+1,
+6
+This shows another difference between the environment and the
+agents: the environment does not possess knowledge.
+7
+We say that two CEGS are isomorphic if they only differ in the
+names of states and/or actions.
+. . . , αk, q ) = α1, . . . , αi−1, αi+1, . . . , αk, q . Similarly, we get
+that inputenv(ˆq , α) = α1, . . . , αk . Thus we get that o (ˆq , α) =
+o1( [q ]∼1 , α1 , input1(ˆq , α)), . . . , ok( [q ]∼k , αk , inputk(ˆq , α)),
+oenv(q , inputenv(ˆq , α)) = [o(q , α1, . . . , αk)]∼1 , . . . ,
+[o(q , α1, . . . , αk)]∼k , o(q , α1, . . . , αk) . Thus, ˆq =
+[q]∼1 , . . . , [q]∼k , q for q = o(q , α1, . . . , αk), which completes
+the proof of (1).
+We now argue that St = Q. Clearly, Q ⊆ St . Let ˆq ∈ St ;
+we must show that ˆq ∈ Q. The argument is on induction on the
+length of the least o path from Q to ˆq. The base case, ˆq ∈ Q, is
+immediate. For the inductive step, ˆq = o (ˆq , α) for some ˆq ∈ Q,
+and then we have that ˆq ∈ Q by (1). Thus, St = Q.
+Now we have a one-to-one correspondence between St and St :
+r ∈ St corresponds to [r]∼1 , . . . , [r]∼k , r ∈ St . It remains to
+be shown that the other parts of the structures M and M agree on
+corresponding states:
+• Agt = Agt,
+• Act = Act,
+• Π =
+Sk
+i=1 Πi ∪ Πenv = Π,
+• For p ∈ Π = Π: [q ]∼1 , . . . , [q ]∼k , q ∈ π (p) iff q ∈
+πenv(p) iff q ∈ π(p) (same valuations at corresponding states),
+• d (i, [q ]∼1 , . . . , [q ]∼k , q ) = di([q ]∼i ) = d(i, q),
+• It follows immediately from (1), and the fact that Q = St ,
+that o ( [q ]∼1 , . . . , [q ]∼k , q , α) = [r ]∼1 , . . . , [r ]∼k , r
+iff o(q , α) = r (transitions on the same joint action in 
+corresponding states lead to corresponding states),
+• [q ]∼1 , . . . , [q ]∼k , q ∼i [r ]∼1 , . . . , [r ]∼k , r iff [q ]∼i =
+[r ]∼i iff q ∼i r (the accessibility relations relate 
+corresponding states), which completes the proof.
+COROLLARY 4. For every CEGS M, there is an ATLir-equivalent
+MIS S with initial states Q, that is, for every state q in M there is
+a state q in cegs(S, Q) satisfying exactly the same ATLir formulae,
+and vice versa.
+PROPOSITION 5. For every CGS M, there is a MIS SM
+and a set
+of global states Q of SM
+such that cgs(SM
+, Q) is isomorphic to M.
+PROOF. Let M = Agt, St, Act, d, o, Π, π be given. Now, let
+ˆM = Agt, St, Act, d, o, Π, π, ∼1, . . . , ∼k for some arbitrary 
+accessibility relations ∼i over St. By Proposition 3, there exists a MIS
+S
+ˆM
+with global states Q such that ˆM = cegs(S
+ˆM
+, Q) is isomorphic
+to ˆM. Let M be the CGS obtained by removing the accessibility
+relations from ˆM . Clearly, M is isomorphic to M.
+COROLLARY 6. For every CGS M, there is an ATL-equivalent
+MIS S with initial states Q. That is, for every state q in M there is a
+state q in cgs(S, Q) satisfying exactly the same ATL formulae, and
+vice versa.
+PROPOSITION 7. The local state spaces in a MIS are not 
+always compact with respect to the underlying concurrent epistemic
+game structure.
+PROOF. Take a CEGS M in which agent i has always perfect 
+information about the current global state of the system. When 
+constructing a modular interpreted system S such that M = cegs(S, Q),
+we have that Sti must be isomorphic with St.
+902 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+The above property is a part of the interpreted systems heritage.
+The next proposition stems from the fact that explicit models (and
+interpreted systems) allow for intensive interaction between agents.
+PROPOSITION 8. The size of In in S is, in general, exponential
+with respect to the number of local states and local actions. This is
+the case even when epistemic relations are not relevant (i.e., when
+S is taken as a representation of an ordinary CGS).
+PROOF. Consider a CGS M with agents Agt = {1, ..., k}, global
+states St =
+Qk
+i=1{qi
+0, ..., qi
+i}, and actions Act = {0, 1}, all enabled
+everywhere. The transition function is defined as
+o( q1
+j1
+, ..., qk
+jk
+, α1, ..., αk) = q1
+l1
+, ..., qk
+lk
+, where li = (ji + α1 +
+... + αk) mod i. Note that M can be represented as a modular 
+interpreted system with succinct local state spaces Sti = {qi
+0, ..., qi
+i}.
+Still, the current actions of all agents are relevant to determine the
+resulting local transition of agent i.
+We will call items In, outi, ini the interaction layer of a 
+modular interpreted system S; the other elements of S constitute the local
+layer of the MIS. In this paper we are ultimately interested in model
+checking complexity with respect to the size of the local layer. To
+this end, we will assume that the size of interaction layer is 
+polynomial in the number of local states and actions. Note that, by
+Propositions 7 and 8, not every explicit model submits to compact
+representation with a MIS. Still, as we declared at the beginning of
+Section 4, we are mainly interested in a modeling framework for
+systems of loosely coupled components, where interaction is 
+essential, but most processing is done locally anyway. More 
+importantly, the framework of MIS allows for separating the interaction
+of agents from their local structure to a larger extent. Moreover, we
+can control and measure the complexity of each layer in a finer way
+than before. First, we can try to abstract from the complexity of a
+layer (e.g. like in this paper, by assuming that the other layer is kept
+within certain complexity bounds). Second, we can also measure
+separately the interaction complexity of different agents.
+4.2 Modular Interpreted Systems vs. Simple
+Reactive Modules
+In this section we show that simple reactive modules are (as we
+already suggested) a specific (and somewhat limited) 
+implementation of modular interpreted systems. First, we define our (quite
+strong) notion of equivalence of representations.
+DEFINITION 7. Two representations are equivalent if they 
+unfold to isomorphic concurrent epistemic game structures. They are
+CGS-equivalent if they unfold to the same CGS.
+PROPOSITION 9. For any SRML there is a CGS-equivalent MIS.
+PROOF. Consider an SRML R with k modules and n variables.
+We construct S = Agt, Act, In with Agt = {a1, ..., ak}, Act =
+{ 1, ..., n, ⊥1, ..., ⊥n}, and In =
+Sk
+i=1 Sti × Sti (the local state
+spaces Sti will be defined in a moment). Let us assume without loss
+of generality that ctri = {x1, ..., xr}. Also, we consider all guarded
+commands of i to be of type γi,ψ : ψ ; xi := , or γ⊥
+i,ψ : ψ ;
+xi := ⊥. Now, agent ai in S has the following components: Sti =
+P(ctri) (i.e., local states of ai are valuations of variables controlled
+by i); di(qi) = { 1, ..., r, ⊥1, ..., ⊥r}; outi(qi, α) = qi, qi ;
+ini(qi, q1, q1 , ..., qi−1, qi−1 , qi+1, qi+1 , qk, qk ) =
+{xi ∈ ctri | q1, ..., qk |=
+W
+γi,ψ
+ψ}, {xi ∈ ctri | q1, ..., qk |=
+W
+γ⊥
+i,ψ
+ψ} . To define local transitions, we consider three cases. If
+t = f = ∅ (no update is enabled), then oi(qi, α, t, f ) = qi for
+every action α. If t = ∅, we take any arbitrary ˆx ∈ t, and 
+define oi(qi, j, t, f ) = qi ∪ {xj} if xj ∈ t, and qi ∪ {ˆx} otherwise;
+oi(qi, ⊥j, t, f ) = qi \ {xj} if xj ∈ f, and qi ∪ {ˆx} otherwise.
+Moreover, if t = ∅ = f, we take any arbitrary ˆx ∈ f, and 
+define oi(qi, j, t, f ) = qi ∪ {xj} if xj ∈ t, and qi \ {ˆx} otherwise;
+oi(qi, ⊥j, t, f ) = qi \{xj} if xj ∈ f, and qi \{ˆx} otherwise. Finally,
+Πi = ctri, and qi ∈ πi(xj) iff xj ∈ qi.
+The above construction shows that SRML have more compact
+representation of states than MIS: ri local variables of agent i give
+rise to 2ri
+local states. In a way, reactive modules (both simple
+and full) are two-level representations: first, the system is 
+represented as a product of modules; next, each module can be seen
+as a product of its variables (together with their update operations).
+Note, however, that specification of updates with respect to a single
+variable in an SRML may require guarded commands of total length
+O(2
+Pk
+i=1 ri
+). Thus, the representation of transitions in SRML is (in
+the worst case) no more compact than in MIS, despite the two-level
+structure of SRML. We observe finally that MIS are more general,
+because in SRML the current actions of other agents have no 
+influence on the outcome of agent i"s current action (although the
+outcome can be influenced by other agents" current local states).
+4.3 Model Checking Modular Interpreted 
+Systems
+One of our main aims was to study the complexity of symbolic
+model checking ATLir in a meaningful way. Following the 
+reviewers" remarks, we state our complexity results only as conjectures.
+Preliminary proofs can be found in [14].
+CONJECTURE 10. Model checking ATL for modular interpreted
+systems is EXPTIME-complete.
+CONJECTURE 11. Model checking ATLir for the class of 
+modular interpreted systems is PSPACE-complete.
+A summary of complexity results for model checking 
+temporal and strategic logics (with and without epistemic component)
+is given in the table below. The table presents completeness 
+results for various models and settings of input parameters. Symbols
+n, k, m stand for the number of states, agents and transitions in an
+explicit model; l is the length of the formula, and nlocal is the 
+number of local states in a concurrent program or modular interpreted
+system. The new results, conjectured in this paper, are printed in
+italics. Note that the result for model checking ATL against modular
+interpreted systems is an extension of the result from [22].
+m, l n, k, l nlocal, k, l
+CTL P [5] P [5] PSPACE [15]
+CTLK P [5, 8] P [5, 8] PSPACE [20]
+ATL P [3] ΔP
+3 [12, 16] EXPTIME
+ATLir ΔP
+2 [21, 13] ΔP
+3 [13] PSPACE
+If we are right, then the results for ATL and ATLir form an 
+intriguing pattern. When we compare model checking agents with
+perfect vs. imperfect information, the first problem appears to be
+much easier against explicit models measured with the number of
+transitions; next, we get the same complexity class against explicit
+models measured with the number of states and agents; finally,
+model checking imperfect information turns out to be easier than
+model checking perfect information for modular interpreted 
+systems. Why can it be so?
+First, a MIS unfolds into CEGS and CGS in a different way. In
+the first case, the MIS is assumed to encode the epistemic relations
+explicitly (which makes it explode when we model agents with 
+perfect, or almost perfect information). In the latter case, the epistemic
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 903
+aspect is ignored, which gives some extra room for encoding the
+transition relation more efficiently. Another crucial factor is the
+number of available strategies (relative to the size of input 
+parameters). The number of all strategies is exponential in the number
+of global states; for uniform strategies, there are usually much less
+of them but still exponentially many in general. Thus, the fact that
+perfect information strategies can be synthesized incrementally has
+a substantial impact on the complexity of the problem. However,
+measured in terms of local states and agents, the number of all
+strategies is doubly exponential, while there are only 
+exponentially many uniform strategies - which settles the results in favor of
+imperfect information.
+5. CONCLUSIONS
+We have presented a new class of representations for open 
+multiagent systems. Our representations, called modular interpreted 
+systems, are: modular, in the sense that components can be changed,
+replaced, removed or added, with as little changes to the whole 
+representation as possible; more compact than traditional explicit 
+representations; and grounded, in the sense that the correspondences
+between the primitives of the model and the entities being 
+modeled are more immediate, giving a methodology for designing and
+implementing systems. We also conjecture that the complexity of
+model checking strategic ability for our representations is higher if
+we assume perfect information than if we assume imperfect 
+information.
+The solutions, proposed in this paper, are not necessarily 
+perfect (for example, the impression functions ini seem to be the
+main source of non-modularity in MIS, and can be perhaps 
+improved), but we believe them to be a step in the right direction.
+We also do not mean to claim that our representations should 
+replace more elaborate modeling languages like Promela or reactive
+modules. We only suggest that there is a need for compact, modular
+and reasonably grounded models that are more expressive than 
+concurrent (epistemic) programs, and still allow for easier theoretical
+analysis than reactive modules. We also suggest that MIS might be
+better suited for modeling simple multi-agent domains, especially
+for human-oriented (as opposed to computer-oriented) design.
+6. ACKNOWLEDGMENTS
+We thank the anonymous reviewers and Andrzej Tarlecki for
+their helpful remarks. Thomas Ågotnes" work on this paper was
+supported by grants 166525/V30 and 176853/S10 from the 
+Research Council of Norway.
+7. REFERENCES
+[1] R. Alur and T. A. Henzinger. Reactive modules. Formal
+Methods in System Design, 15(1):7-48, 1999.
+[2] R. Alur, T. A. Henzinger, and O. Kupferman.
+Alternating-time Temporal Logic. Lecture Notes in
+Computer Science, 1536:23-60, 1998.
+[3] R. Alur, T. A. Henzinger, and O. Kupferman.
+Alternating-time Temporal Logic. Journal of the ACM,
+49:672-713, 2002.
+[4] R. Alur, T.A. Henzinger, F.Y.C. Mang, S. Qadeer, S.K.
+Rajamani, and S. Tasiran. MOCHA user manual. In
+Proceedings of CAV"98, volume 1427 of Lecture Notes in
+Computer Science, pages 521-525, 1998.
+[5] E.M. Clarke, E.A. Emerson, and A.P. Sistla. Automatic
+verification of finite-state concurrent systems using temporal
+logic specifications. ACM Transactions on Programming
+Languages and Systems, 8(2):244-263, 1986.
+[6] E.A. Emerson and J.Y. Halpern. "sometimes" and "not never"
+revisited: On branching versus linear time temporal logic. In
+Proceedings of the Annual ACM Symposium on Principles of
+Programming Languages, pages 151-178, 1982.
+[7] R. Fagin, J. Y. Halpern, Y. Moses, and M. Y. Vardi.
+Reasoning about Knowledge. MIT Press: Cambridge, MA,
+1995.
+[8] M. Franceschet, A. Montanari, and M. de Rijke. Model
+checking for combined logics. In Proceedings of the 3rd
+International Conference on Temporal Logic (ICTL), 2000.
+[9] V. Goranko and W. Jamroga. Comparing semantics of logics
+for multi-agent systems. Synthese, 139(2):241-280, 2004.
+[10] J. Y. Halpern. Reasoning about knowledge: a survey. In
+D. M. Gabbay, C. J. Hogger, and J. A. Robinson, editors, The
+Handbook of Logic in Artificial Intelligence and Logic
+Programming, Volume IV, pages 1-34. Oxford University
+Press, 1995.
+[11] J.Y. Halpern and R. Fagin. Modelling knowledge and action
+in distributed systems. Distributed Computing,
+3(4):159-177, 1989.
+[12] W. Jamroga and J. Dix. Do agents make model checking
+explode (computationally)? In M. P˘echou˘cek, P. Petta, and
+L.Z. Varga, editors, Proceedings of CEEMAS 2005, volume
+3690 of Lecture Notes in Computer Science, pages 398-407.
+Springer Verlag, 2005.
+[13] W. Jamroga and J. Dix. Model checking abilities of agents:
+A closer look. Submitted, 2006.
+[14] W. Jamroga and T. Ågotnes. Modular interpreted systems: A
+preliminary report. Technical Report IfI-06-15, Clausthal
+University of Technology, 2006.
+[15] O. Kupferman, M.Y. Vardi, and P. Wolper. An
+automata-theoretic approach to branching-time model
+checking. Journal of the ACM, 47(2):312-360, 2000.
+[16] F. Laroussinie, N. Markey, and G. Oreiby. Expressiveness
+and complexity of ATL. Technical Report LSV-06-03, CNRS
+& ENS Cachan, France, 2006.
+[17] K.L. McMillan. Symbolic Model Checking: An Approach to
+the State Explosion Problem. Kluwer Academic Publishers,
+1993.
+[18] K.L. McMillan. Applying SAT methods in unbounded
+symbolic model checking. In Proceedings of CAV"02,
+volume 2404 of Lecture Notes in Computer Science, pages
+250-264, 2002.
+[19] W. Penczek and A. Lomuscio. Verifying epistemic properties
+of multi-agent systems via bounded model checking. In
+Proceedings of AAMAS"03, pages 209-216, New York, NY,
+USA, 2003. ACM Press.
+[20] F. Raimondi and A. Lomuscio. The complexity of symbolic
+model checking temporal-epistemic logics. In L. Czaja,
+editor, Proceedings of CS&P"05, 2005.
+[21] P. Y. Schobbens. Alternating-time logic with imperfect
+recall. Electronic Notes in Theoretical Computer Science,
+85(2), 2004.
+[22] W. van der Hoek, A. Lomuscio, and M. Wooldridge. On the
+complexity of practical ATL model checking. In P. Stone and
+G. Weiss, editors, Proceedings of AAMAS"06, pages
+201-208, 2006.
+904 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)

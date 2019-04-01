@@ -1,0 +1,1127 @@
+On Opportunistic Techniques for Solving Decentralized
+Markov Decision Processes with Temporal Constraints
+Janusz Marecki and Milind Tambe
+Computer Science Department
+University of Southern California
+941 W 37th Place, Los Angeles, CA 90089
+{marecki, tambe}@usc.edu
+ABSTRACT
+Decentralized Markov Decision Processes (DEC-MDPs) are a 
+popular model of agent-coordination problems in domains with 
+uncertainty and time constraints but very difficult to solve. In this
+paper, we improve a state-of-the-art heuristic solution method for
+DEC-MDPs, called OC-DEC-MDP, that has recently been shown
+to scale up to larger DEC-MDPs. Our heuristic solution method,
+called Value Function Propagation (VFP), combines two 
+orthogonal improvements of OC-DEC-MDP. First, it speeds up 
+OC-DECMDP by an order of magnitude by maintaining and manipulating
+a value function for each state (as a function of time) rather than a
+separate value for each pair of sate and time interval. Furthermore,
+it achieves better solution qualities than OC-DEC-MDP because,
+as our analytical results show, it does not overestimate the expected
+total reward like OC-DEC- MDP. We test both improvements 
+independently in a crisis-management domain as well as for other
+types of domains. Our experimental results demonstrate a 
+significant speedup of VFP over OC-DEC-MDP as well as higher solution
+qualities in a variety of situations.
+Categories and Subject Descriptors
+I.2.11 [Artificial Intelligence]: Distributed Artificial 
+IntelligenceMulti-agent Systems
+General Terms
+Algorithms, Theory
+1. INTRODUCTION
+The development of algorithms for effective coordination of 
+multiple agents acting as a team in uncertain and time critical domains
+has recently become a very active research field with potential 
+applications ranging from coordination of agents during a hostage 
+rescue mission [11] to the coordination of Autonomous Mars 
+Exploration Rovers [2]. Because of the uncertain and dynamic 
+characteristics of such domains, decision-theoretic models have received
+a lot of attention in recent years, mainly thanks to their 
+expressiveness and the ability to reason about the utility of actions over
+time.
+Key decision-theoretic models that have become popular in the 
+literature include Decentralized Markov Decision Processes 
+(DECMDPs) and Decentralized, Partially Observable Markov Decision
+Processes (DEC-POMDPs). Unfortunately, solving these models
+optimally has been proven to be NEXP-complete [3], hence more
+tractable subclasses of these models have been the subject of 
+intensive research. In particular, Network Distributed POMDP [13]
+which assume that not all the agents interact with each other, 
+Transition Independent DEC-MDP [2] which assume that transition 
+function is decomposable into local transition functions or DEC-MDP
+with Event Driven Interactions [1] which assume that interactions
+between agents happen at fixed time points constitute good 
+examples of such subclasses. Although globally optimal algorithms for
+these subclasses have demonstrated promising results, domains on
+which these algorithms run are still small and time horizons are
+limited to only a few time ticks.
+To remedy that, locally optimal algorithms have been proposed
+[12] [4] [5]. In particular, Opportunity Cost DEC-MDP [4] [5],
+referred to as OC-DEC-MDP, is particularly notable, as it has been
+shown to scale up to domains with hundreds of tasks and double
+digit time horizons. Additionally, OC-DEC-MDP is unique in its
+ability to address both temporal constraints and uncertain method
+execution durations, which is an important factor for real-world 
+domains. OC-DEC-MDP is able to scale up to such domains mainly
+because instead of searching for the globally optimal solution, it
+carries out a series of policy iterations; in each iteration it performs
+a value iteration that reuses the data computed during the previous
+policy iteration. However, OC-DEC-MDP is still slow, especially
+as the time horizon and the number of methods approach large 
+values. The reason for high runtimes of OC-DEC-MDP for such 
+domains is a consequence of its huge state space, i.e., OC-DEC-MDP
+introduces a separate state for each possible pair of method and
+method execution interval. Furthermore, OC-DEC-MDP 
+overestimates the reward that a method expects to receive for enabling
+the execution of future methods. This reward, also referred to as
+the opportunity cost, plays a crucial role in agent decision making,
+and as we show later, its overestimation leads to highly suboptimal
+policies.
+In this context, we present VFP (= Value Function P ropagation),
+an efficient solution technique for the DEC-MDP model with 
+temporal constraints and uncertain method execution durations, that
+builds on the success of OC-DEC-MDP. VFP introduces our two
+orthogonal ideas: First, similarly to [7] [9] and [10], we maintain
+830
+978-81-904262-7-5 (RPS) c 2007 IFAAMAS
+and manipulate a value function over time for each method rather
+than a separate value for each pair of method and time interval.
+Such representation allows us to group the time points for which
+the value function changes at the same rate (= its slope is 
+constant), which results in fast, functional propagation of value 
+functions. Second, we prove (both theoretically and empirically) that
+OC-DEC- MDP overestimates the opportunity cost, and to remedy
+that, we introduce a set of heuristics, that correct the opportunity
+cost overestimation problem.
+This paper is organized as follows: In section 2 we motivate this
+research by introducing a civilian rescue domain where a team of
+fire- brigades must coordinate in order to rescue civilians trapped in
+a burning building. In section 3 we provide a detailed description of
+our DEC-MDP model with Temporal Constraints and in section 4
+we discuss how one could solve the problems encoded in our model
+using globally optimal and locally optimal solvers. Sections 5 and
+6 discuss the two orthogonal improvements to the state-of-the-art
+OC-DEC-MDP algorithm that our VFP algorithm implements. 
+Finally, in section 7 we demonstrate empirically the impact of our two
+orthogonal improvements, i.e., we show that: (i) The new 
+heuristics correct the opportunity cost overestimation problem leading to
+higher quality policies, and (ii) By allowing for a systematic 
+tradeoff of solution quality for time, the VFP algorithm runs much faster
+than the OC-DEC-MDP algorithm
+2. MOTIVATING EXAMPLE
+We are interested in domains where multiple agents must 
+coordinate their plans over time, despite uncertainty in plan execution
+duration and outcome. One example domain is large-scale disaster,
+like a fire in a skyscraper. Because there can be hundreds of 
+civilians scattered across numerous floors, multiple rescue teams have
+to be dispatched, and radio communication channels can quickly
+get saturated and useless. In particular, small teams of fire-brigades
+must be sent on separate missions to rescue the civilians trapped in
+dozens of different locations.
+Picture a small mission plan from Figure (1), where three 
+firebrigades have been assigned a task to rescue the civilians trapped
+at site B, accessed from site A (e.g. an office accessed from the
+floor)1
+. General fire fighting procedures involve both: (i) putting
+out the flames, and (ii) ventilating the site to let the toxic, high 
+temperature gases escape, with the restriction that ventilation should
+not be performed too fast in order to prevent the fire from spreading.
+The team estimates that the civilians have 20 minutes before the fire
+at site B becomes unbearable, and that the fire at site A has to be
+put out in order to open the access to site B. As has happened in
+the past in large scale disasters, communication often breaks down;
+and hence we assume in this domain that there is no 
+communication between the fire-brigades 1,2 and 3 (denoted as FB1, FB2 and
+FB3). Consequently, FB2 does not know if it is already safe to 
+ventilate site A, FB1 does not know if it is already safe to enter site A
+and start fighting fire at site B, etc. We assign the reward 50 for
+evacuating the civilians from site B, and a smaller reward 20 for
+the successful ventilation of site A, since the civilians themselves
+might succeed in breaking out from site B.
+One can clearly see the dilemma, that FB2 faces: It can only 
+estimate the durations of the Fight fire at site A methods to be 
+executed by FB1 and FB3, and at the same time FB2 knows that time
+is running out for civilians. If FB2 ventilates site A too early, the
+fire will spread out of control, whereas if FB2 waits with the 
+ventilation method for too long, fire at site B will become unbearable for
+the civilians. In general, agents have to perform a sequence of such
+1
+We explain the EST and LET notation in section 3
+Figure 1: Civilian rescue domain and a mission plan. Dotted 
+arrows represent implicit precedence constraints within an agent.
+difficult decisions; in particular, decision process of FB2 involves
+first choosing when to start ventilating site A, and then 
+(depending on the time it took to ventilate site A), choosing when to start
+evacuating the civilians from site B. Such sequence of decisions
+constitutes the policy of an agent, and it must be found fast because
+time is running out.
+3. MODEL DESCRIPTION
+We encode our decision problems in a model which we refer to as
+Decentralized MDP with Temporal Constraints 2
+. Each instance of
+our decision problems can be described as a tuple M, A, C, P, R
+where M = {mi}
+|M|
+i=1 is the set of methods, and A = {Ak}
+|A|
+k=1
+is the set of agents. Agents cannot communicate during mission
+execution. Each agent Ak is assigned to a set Mk of methods,
+such that
+S|A|
+k=1 Mk = M and ∀i,j;i=jMi ∩ Mj = ø. Also, each
+method of agent Ak can be executed only once, and agent Ak can
+execute only one method at a time. Method execution times are
+uncertain and P = {pi}
+|M|
+i=1 is the set of distributions of method
+execution durations. In particular, pi(t) is the probability that the
+execution of method mi consumes time t. C is a set of 
+temporal constraints in the system. Methods are partially ordered and
+each method has fixed time windows inside which it can be 
+executed, i.e., C = C≺ ∪ C[ ] where C≺ is the set of predecessor
+constraints and C[ ] is the set of time window constraints. For
+c ∈ C≺, c = mi, mj means that method mi precedes method
+mj i.e., execution of mj cannot start before mi terminates. In 
+particular, for an agent Ak, all its methods form a chain linked by
+predecessor constraints. We assume, that the graph G = M, C≺
+is acyclic, does not have disconnected nodes (the problem cannot
+be decomposed into independent subproblems), and its source and
+sink vertices identify the source and sink methods of the system.
+For c ∈ C[ ], c = mi, EST, LET means that execution of mi
+can only start after the Earliest Starting Time EST and must 
+finish before the Latest End Time LET; we allow methods to have
+multiple disjoint time window constraints. Although distributions
+pi can extend to infinite time horizons, given the time window 
+constraints, the planning horizon Δ = max m,τ,τ ∈C[ ] τ is 
+considered as the mission deadline. Finally, R = {ri}
+|M|
+i=1 is the set of
+non-negative rewards, i.e., ri is obtained upon successful 
+execution of mi.
+Since there is no communication allowed, an agent can only 
+estimate the probabilities that its methods have already been enabled
+2
+One could also use the OC-DEC-MDP framework, which models
+both time and resource constraints
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 831
+by other agents. Consequently, if mj ∈ Mk is the next method
+to be executed by the agent Ak and the current time is t ∈ [0, Δ],
+the agent has to make a decision whether to Execute the method
+mj (denoted as E), or to Wait (denoted as W). In case agent Ak
+decides to wait, it remains idle for an arbitrary small time , and 
+resumes operation at the same place (= about to execute method mj)
+at time t + . In case agent Ak decides to Execute the next method,
+two outcomes are possible:
+Success: The agent Ak receives reward rj and moves on to its
+next method (if such method exists) so long as the following 
+conditions hold: (i) All the methods {mi| mi, mj ∈ C≺} that 
+directly enable method mj have already been completed, (ii) 
+Execution of method mj started in some time window of method mj, i.e.,
+∃ mj ,τ,τ ∈C[ ]
+such that t ∈ [τ, τ ], and (iii) Execution of method
+mj finished inside the same time window, i.e., agent Ak completed
+method mj in time less than or equal to τ − t.
+Failure: If any of the above-mentioned conditions does not hold,
+agent Ak stops its execution. Other agents may continue their 
+execution, but methods mk ∈ {m| mj, m ∈ C≺} will never become
+enabled.
+The policy πk of an agent Ak is a function πk : Mk × [0, Δ] →
+{W, E}, and πk( m, t ) = a means, that if Ak is at method m
+at time t, it will choose to perform the action a. A joint policy
+π = [πk]
+|A|
+k=1 is considered to be optimal (denoted as π∗
+), if it
+maximizes the sum of expected rewards for all the agents.
+4. SOLUTION TECHNIQUES
+4.1 Optimal Algorithms
+Optimal joint policy π∗
+is usually found by using the Bellman 
+update principle, i.e., in order to determine the optimal policy for
+method mj, optimal policies for methods mk ∈ {m| mj, m ∈
+C≺} are used. Unfortunately, for our model, the optimal 
+policy for method mj also depends on policies for methods mi ∈
+{m| m, mj ∈ C≺}. This double dependency results from the
+fact, that the expected reward for starting the execution of method
+mj at time t also depends on the probability that method mj will be
+enabled by time t. Consequently, if time is discretized, one needs to
+consider Δ|M|
+candidate policies in order to find π∗
+. Thus, 
+globally optimal algorithms used for solving real-world problems are
+unlikely to terminate in reasonable time [11]. The complexity of
+our model could be reduced if we considered its more restricted
+version; in particular, if each method mj was allowed to be 
+enabled at time points t ∈ Tj ⊂ [0, Δ], the Coverage Set Algorithm
+(CSA) [1] could be used. However, CSA complexity is double 
+exponential in the size of Ti, and for our domains Tj can store all
+values ranging from 0 to Δ.
+4.2 Locally Optimal Algorithms
+Following the limited applicability of globally optimal algorithms
+for DEC-MDPs with Temporal Constraints, locally optimal 
+algorithms appear more promising. Specially, the OC-DEC-MDP 
+algorithm [4] is particularly significant, as it has shown to easily scale
+up to domains with hundreds of methods. The idea of the 
+OC-DECMDP algorithm is to start with the earliest starting time policy π0
+(according to which an agent will start executing the method m as
+soon as m has a non-zero chance of being already enabled), and
+then improve it iteratively, until no further improvement is 
+possible. At each iteration, the algorithm starts with some policy π,
+which uniquely determines the probabilities Pi,[τ,τ ] that method
+mi will be performed in the time interval [τ, τ ]. It then performs
+two steps:
+Step 1: It propagates from sink methods to source methods the
+values Vi,[τ,τ ], that represent the expected utility for executing
+method mi in the time interval [τ, τ ]. This propagation uses the
+probabilities Pi,[τ,τ ] from previous algorithm iteration. We call
+this step a value propagation phase.
+Step 2: Given the values Vi,[τ,τ ] from Step 1, the algorithm chooses
+the most profitable method execution intervals which are stored in
+a new policy π . It then propagates the new probabilities Pi,[τ,τ ]
+from source methods to sink methods. We call this step a 
+probability propagation phase. If policy π does not improve π, the
+algorithm terminates.
+There are two shortcomings of the OC-DEC-MDP algorithm that
+we address in this paper. First, each of OC-DEC-MDP states is a
+pair mj, [τ, τ ] , where [τ, τ ] is a time interval in which method
+mj can be executed. While such state representation is beneficial,
+in that the problem can be solved with a standard value iteration 
+algorithm, it blurs the intuitive mapping from time t to the expected
+total reward for starting the execution of mj at time t. 
+Consequently, if some method mi enables method mj, and the values
+Vj,[τ,τ ]∀τ,τ ∈[0,Δ] are known, the operation that calculates the 
+values Vi,[τ,τ ]∀τ, τ ∈ [0, Δ] (during the value propagation phase),
+runs in time O(I2
+), where I is the number of time intervals 3
+. Since
+the runtime of the whole algorithm is proportional to the runtime of
+this operation, especially for big time horizons Δ, the OC- 
+DECMDP algorithm runs slow.
+Second, while OC-DEC-MDP emphasizes on precise calculation
+of values Vj,[τ,τ ], it fails to address a critical issue that determines
+how the values Vj,[τ,τ ] are split given that the method mj has 
+multiple enabling methods. As we show later, OC-DEC-MDP splits
+Vj,[τ,τ ] into parts that may overestimate Vj,[τ,τ ] when summed up
+again. As a result, methods that precede the method mj 
+overestimate the value for enabling mj which, as we show later, can have
+disastrous consequences. In the next two sections, we address both
+of these shortcomings.
+5. VALUE FUNCTION PROPAGATION (VFP)
+The general scheme of the VFP algorithm is identical to the 
+OCDEC-MDP algorithm, in that it performs a series of policy 
+improvement iterations, each one involving a Value and Probability
+Propagation Phase. However, instead of propagating separate 
+values, VFP maintains and propagates the whole functions, we 
+therefore refer to these phases as the value function propagation phase
+and the probability function propagation phase. To this end, for
+each method mi ∈ M, we define three new functions:
+Value Function, denoted as vi(t), that maps time t ∈ [0, Δ] to the
+expected total reward for starting the execution of method mi at
+time t.
+Opportunity Cost Function, denoted as Vi(t), that maps time
+t ∈ [0, Δ] to the expected total reward for starting the execution
+of method mi at time t assuming that mi is enabled.
+Probability Function, denoted as Pi(t), that maps time t ∈ [0, Δ]
+to the probability that method mi will be completed before time
+t.
+Such functional representation allows us to easily read the current
+policy, i.e., if an agent Ak is at method mi at time t, then it will
+wait as long as value function vi(t) will be greater in the future.
+Formally:
+πk( mi, t ) =
+j
+W if ∃t >t such that vi(t) < vi(t )
+E otherwise.
+We now develop an analytical technique for performing the value
+function and probability function propagation phases.
+3
+Similarly for the probability propagation phase
+832 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+5.1 Value Function Propagation Phase
+Suppose, that we are performing a value function propagation phase
+during which the value functions are propagated from the sink 
+methods to the source methods. At any time during this phase we 
+encounter a situation shown in Figure 2, where opportunity cost 
+functions [Vjn ]N
+n=0 of methods [mjn ]N
+n=0 are known, and the 
+opportunity cost Vi0 of method mi0 is to be derived. Let pi0 be the
+probability distribution function of method mi0 execution 
+duration, and ri0 be the immediate reward for starting and 
+completing the execution of method mi0 inside a time interval [τ, τ ] such
+that mi0 τ, τ ∈ C[ ]. The function Vi0 is then derived from ri0
+and opportunity costs Vjn,i0 (t) n = 1, ..., N from future methods.
+Formally:
+Vi0 (t) =
+8
+>><
+>>:
+R τ −t
+0
+pi0 (t )(ri0 +
+PN
+n=0 Vjn,i0 (t + t ))dt
+if ∃ mi0
+τ,τ ∈C[ ]
+such that t ∈ [τ, τ ]
+0 otherwise
+(1)
+Note, that for t ∈ [τ, τ ], if h(t) := ri0 +
+PN
+n=0 Vjn,i0 (τ −t) then
+Vi0 is a convolution of p and h: vi0 (t) = (pi0 ∗h)(τ −t).
+Assume for now, that Vjn,i0 represents a full opportunity cost, 
+postponing the discussion on different techniques for splitting the 
+opportunity cost Vj0 into [Vj0,ik ]K
+k=0 until section 6. We now show
+how to derive Vj0,i0 (derivation of Vjn,i0 for n = 0 follows the
+same scheme).
+Figure 2: Fragment of an MDP of agent Ak. Probability 
+functions propagate forward (left to right) whereas value functions
+propagate backward (right to left).
+Let V j0,i0 (t) be the opportunity cost of starting the execution of
+method mj0 at time t given that method mi0 has been completed.
+It is derived by multiplying Vi0 by the probability functions of all
+methods other than mi0 that enable mj0 . Formally:
+V j0,i0 (t) = Vj0 (t) ·
+KY
+k=1
+Pik (t).
+Where similarly to [4] and [5] we ignored the dependency of [Plk ]K
+k=1.
+Observe that V j0,i0 does not have to be monotonically 
+decreasing, i.e., delaying the execution of the method mi0 can sometimes
+be profitable. Therefore the opportunity cost Vj0,i0 (t) of enabling
+method mi0 at time t must be greater than or equal to V j0,i0 . 
+Furthermore, Vj0,i0 should be non-increasing. Formally:
+Vj0,i0 = min
+f∈F
+f (2)
+Where F = {f | f ≥ V j0,i0 and f(t) ≥ f(t ) ∀t<t }.
+Knowing the opportunity cost Vi0 , we can then easily derive the
+value function vi0 . Let Ak be an agent assigned to the method mi0 .
+If Ak is about to start the execution of mi0 it means, that Ak must
+have completed its part of the mission plan up to the method mi0 .
+Since Ak does not know if other agents have completed methods
+[mlk ]k=K
+k=1 , in order to derive vi0 , it has to multiply Vi0 by the 
+probability functions of all methods of other agents that enable mi0 .
+Formally:
+vi0 (t) = Vi0 (t) ·
+KY
+k=1
+Plk (t)
+Where the dependency of [Plk ]K
+k=1 is also ignored.
+We have consequently shown a general scheme how to propagate
+the value functions: Knowing [vjn ]N
+n=0 and [Vjn ]N
+n=0 of methods
+[mjn ]N
+n=0 we can derive vi0 and Vi0 of method mi0 . In general, the
+value function propagation scheme starts with sink nodes. It then
+visits at each time a method m, such that all the methods that m
+enables have already been marked as visited. The value function
+propagation phase terminates when all the source methods have
+been marked as visited.
+5.2 Reading the Policy
+In order to determine the policy of agent Ak for the method mj0
+we must identify the set Zj0 of intervals [z, z ] ⊂ [0, ..., Δ], such
+that:
+∀t∈[z,z ] πk( mj0 , t ) = W.
+One can easily identify the intervals of Zj0 by looking at the time
+intervals in which the value function vj0 does not decrease 
+monotonically.
+5.3 Probability Function Propagation Phase
+Assume now, that value functions and opportunity cost values have
+all been propagated from sink methods to source nodes and the sets
+Zj for all methods mj ∈ M have been identified. Since value
+function propagation phase was using probabilities Pi(t) for 
+methods mi ∈ M and times t ∈ [0, Δ] found at previous algorithm
+iteration, we now have to find new values Pi(t), in order to prepare
+the algorithm for its next iteration. We now show how in the general
+case (Figure 2) propagate the probability functions forward through
+one method, i.e., we assume that the probability functions [Pik ]K
+k=0
+of methods [mik ]K
+k=0 are known, and the probability function Pj0
+of method mj0 must be derived. Let pj0 be the probability 
+distribution function of method mj0 execution duration, and Zj0 be the
+set of intervals of inactivity for method mj0 , found during the last
+value function propagation phase. If we ignore the dependency of
+[Pik ]K
+k=0 then the probability Pj0 (t) that the execution of method
+mj0 starts before time t is given by:
+Pj0 (t) =
+(QK
+k=0 Pik (τ) if ∃(τ, τ ) ∈ Zj0 s.t. t ∈ (τ, τ )
+QK
+k=0 Pik (t) otherwise.
+Given Pj0 (t), the probability Pj0 (t) that method mj0 will be 
+completed by time t is derived by:
+Pj0 (t) =
+Z t
+0
+Z t
+0
+(
+∂Pj0
+∂t
+)(t ) · pj0 (t − t )dt dt (3)
+Which can be written compactly as
+∂Pj0
+∂t
+= pj0 ∗
+∂P j0
+∂t
+.
+We have consequently shown how to propagate the probability 
+functions [Pik ]K
+k=0 of methods [mik ]K
+k=0 to obtain the probability 
+function Pj0 of method mj0 . The general, the probability function
+propagation phase starts with source methods msi for which we
+know that Psi = 1 since they are enabled by default. We then
+visit at each time a method m such that all the methods that enable
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 833
+m have already been marked as visited. The probability function
+propagation phase terminates when all the sink methods have been
+marked as visited.
+5.4 The Algorithm
+Similarly to the OC-DEC-MDP algorithm, VFP starts the policy
+improvement iterations with the earliest starting time policy π0
+.
+Then at each iteration it: (i) Propagates the value functions [vi]
+|M|
+i=1
+using the old probability functions [Pi]
+|M|
+i=1 from previous algorithm
+iteration and establishes the new sets [Zi]
+|M|
+i=1 of method inactivity
+intervals, and (ii) propagates the new probability functions [Pi ]
+|M|
+i=1
+using the newly established sets [Zi]
+|M|
+i=1. These new functions
+[Pi ]
+|M|
+i=1 are then used in the next iteration of the algorithm. 
+Similarly to OC-DEC-MDP, VFP terminates if a new policy does not
+improve the policy from the previous algorithm iteration.
+5.5 Implementation of Function Operations
+So far, we have derived the functional operations for value function
+and probability function propagation without choosing any 
+function representation. In general, our functional operations can 
+handle continuous time, and one has freedom to choose a desired 
+function approximation technique, such as piecewise linear [7] or 
+piecewise constant [9] approximation. However, since one of our goals
+is to compare VFP with the existing OC-DEC- MDP algorithm, that
+works only for discrete time, we also discretize time, and choose to
+approximate value functions and probability functions with 
+piecewise linear (PWL) functions.
+When the VFP algorithm propagates the value functions and 
+probability functions, it constantly carries out operations represented by
+equations (1) and (3) and we have already shown that these 
+operations are convolutions of some functions p(t) and h(t). If time is
+discretized, functions p(t) and h(t) are discrete; however, h(t) can
+be nicely approximated with a PWL function bh(t), which is exactly
+what VFP does. As a result, instead of performing O(Δ2
+) 
+multiplications to compute f(t), VFP only needs to perform O(k · Δ)
+multiplications to compute f(t), where k is the number of linear
+segments of bh(t) (note, that since h(t) is monotonic, bh(t) is 
+usually close to h(t) with k Δ). Since Pi values are in range
+[0, 1] and Vi values are in range [0,
+P
+mi∈M ri], we suggest to 
+approximate Vi(t) with bVi(t) within error V , and Pi(t) with bPi(t)
+within error P . We now prove that the overall approximation error
+accumulated during the value function propagation phase can be
+expressed in terms of P and V :
+THEOREM 1. Let C≺ be a set of precedence constraints of a
+DEC-MDP with Temporal Constraints, and P and V be the 
+probability function and value function approximation errors 
+respectively. The overall error π = maxV supt∈[0,Δ]|V (t) − bV (t)| of
+value function propagation phase is then bounded by:
+|C≺|
+
+V + ((1 + P )|C≺|
+− 1)
+P
+mi∈M ri
+
+.
+PROOF. In order to establish the bound for π, we first prove
+by induction on the size of C≺, that the overall error of 
+probability function propagation phase, π(P ) = maxP supt∈[0,Δ]|P(t) −
+bP(t)| is bounded by (1 + P )|C≺|
+− 1.
+Induction base: If n = 1 only two methods are present, and we
+will perform the operation identified by Equation (3) only once,
+introducing the error π(P ) = P = (1 + P )|C≺|
+− 1.
+Induction step: Suppose, that π(P ) for |C≺| = n is bounded by
+(1 + P )n
+− 1, and we want to prove that this statement holds for
+|C≺| = n. Let G = M, C≺ be a graph with at most n + 1
+edges, and G = M, C≺ be a subgraph of G, such that C≺ =
+C≺ − { mi, mj }, where mj ∈ M is a sink node in G. From the
+induction assumption we have, that C≺ introduces the probability
+propagation phase error bounded by (1 + P )n
+− 1. We now add
+back the link { mi, mj } to C≺, which affects the error of only
+one probability function, namely Pj, by a factor of (1 + P ). Since
+probability propagation phase error in C≺ was bounded by (1 +
+P )n
+− 1, in C≺ = C≺ ∪ { mi, mj } it can be at most ((1 +
+P )n
+− 1)(1 + P ) < (1 + P )n+1
+− 1. Thus, if opportunity cost
+functions are not overestimated, they are bounded by
+P
+mi∈M ri
+and the error of a single value function propagation operation will
+be at most
+Z Δ
+0
+p(t)( V +((1+ P )
+|C≺|
+−1)
+X
+mi∈M
+ri) dt < V +((1+ P )
+|C≺|
+−1)
+X
+mi∈M
+ri.
+Since the number of value function propagation operations is |C≺|,
+the total error π of the value function propagation phase is bounded
+by: |C≺|
+
+V + ((1 + P )|C≺|
+− 1)
+P
+mi∈M ri
+
+.
+6. SPLITTING THE OPPORTUNITY COST
+FUNCTIONS
+In section 5 we left out the discussion about how the 
+opportunity cost function Vj0 of method mj0 is split into opportunity cost
+functions [Vj0,ik ]K
+k=0 sent back to methods [mik ]K
+k=0 , that 
+directly enable method mj0 . So far, we have taken the same 
+approach as in [4] and [5] in that the opportunity cost function Vj0,ik
+that the method mik sends back to the method mj0 is a 
+minimal, non-increasing function that dominates function V j0,ik (t) =
+(Vj0 ·
+Q
+k ∈{0,...,K}
+k =k
+Pik
+)(t). We refer to this approach, as 
+heuristic H 1,1 . Before we prove that this heuristic overestimates the
+opportunity cost, we discuss three problems that might occur when
+splitting the opportunity cost functions: (i) overestimation, (ii) 
+underestimation and (iii) starvation. Consider the situation in Figure
+Figure 3: Splitting the value function of method mj0 among
+methods [mik ]K
+k=0.
+(3) when value function propagation for methods [mik ]K
+k=0 is 
+performed. For each k = 0, ..., K, Equation (1) derives the 
+opportunity cost function Vik from immediate reward rk and 
+opportunity cost function Vj0,ik . If m0 is the only methods that precedes
+method mk, then V ik,0 = Vik is propagated to method m0, and
+consequently the opportunity cost for completing the method m0 at
+time t is equal to
+PK
+k=0 Vik,0(t). If this cost is overestimated, then
+an agent A0 at method m0 will have too much incentive to finish
+the execution of m0 at time t. Consequently, although the 
+probability P(t) that m0 will be enabled by other agents by time t is low,
+agent A0 might still find the expected utility of starting the 
+execution of m0 at time t higher than the expected utility of doing it later.
+As a result, it will choose at time t to start executing method m0
+instead of waiting, which can have disastrous consequences. 
+Similarly, if
+PK
+k=0 Vik,0(t) is underestimated, agent A0 might loose
+interest in enabling the future methods [mik ]K
+k=0 and just focus on
+834 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+maximizing the chance of obtaining its immediate reward r0. Since
+this chance is increased when agent A0 waits4
+, it will consider at
+time t to be more profitable to wait, instead of starting the 
+execution of m0, which can have similarly disastrous consequences.
+Finally, if Vj0 is split in a way, that for some k, Vj0,ik = 0, it is the
+method mik that underestimates the opportunity cost of enabling
+method mj0 , and the similar reasoning applies. We call such 
+problem a starvation of method mk. That short discussion shows the
+importance of splitting the opportunity cost function Vj0 in such a
+way, that overestimation, underestimation, and starvation problem
+is avoided. We now prove that:
+THEOREM 2. Heuristic H 1,1 can overestimate the 
+opportunity cost.
+PROOF. We prove the theorem by showing a case where the
+overestimation occurs. For the mission plan from Figure (3), let
+H 1,1 split Vj0 into [V j0,ik = Vj0 ·
+Q
+k ∈{0,...,K}
+k =k
+Pik
+]K
+k=0 sent to
+methods [mik ]K
+k=0 respectively. Also, assume that methods [mik ]K
+k=0
+provide no local reward and have the same time windows, i.e.,
+rik = 0; ESTik = 0, LETik = Δ for k = 0, ..., K. To prove the
+overestimation of opportunity cost, we must identify t0 ∈ [0, ..., Δ]
+such that the opportunity cost
+PK
+k=0 Vik (t) for methods [mik ]K
+k=0
+at time t ∈ [0, .., Δ] is greater than the opportunity cost Vj0 (t).
+From Equation (1) we have:
+Vik
+(t) =
+Z Δ−t
+0
+pik
+(t )Vj0,ik
+(t + t )dt
+Summing over all methods [mik ]K
+k=0 we obtain:
+KX
+k=0
+Vik
+(t) =
+KX
+k=0
+Z Δ−t
+0
+pik
+(t )Vj0,ik
+(t + t )dt (4)
+≥
+KX
+k=0
+Z Δ−t
+0
+pik
+(t )V j0,ik
+(t + t )dt
+=
+KX
+k=0
+Z Δ−t
+0
+pik
+(t )Vj0 (t + t )
+Y
+k ∈{0,...,K}
+k =k
+Pik
+(t + t )dt
+Let c ∈ (0, 1] be a constant and t0 ∈ [0, Δ] be such that ∀t>t0
+and ∀k=0,..,K we have
+Q
+k ∈{0,...,K}
+k =k
+Pik
+(t) > c. Then:
+KX
+k=0
+Vik
+(t0) >
+KX
+k=0
+Z Δ−t0
+0
+pik
+(t )Vj0 (t0 + t ) · c dt
+Because Pjk
+is non-decreasing. Now, suppose there exists t1 ∈
+(t0, Δ], such that
+PK
+k=0
+R t1−t0
+0
+pik (t )dt >
+Vj0
+(t0)
+c·Vj0
+(t1)
+. Since 
+decreasing the upper limit of the integral over positive function also
+decreases the integral, we have:
+KX
+k=0
+Vik
+(t0) > c
+KX
+k=0
+Z t1
+t0
+pik
+(t − t0)Vj0 (t )dt
+And since Vj0 (t ) is non-increasing we have:
+KX
+k=0
+Vik
+(t0) > c · Vj0 (t1)
+KX
+k=0
+Z t1
+t0
+pik
+(t − t0)dt (5)
+= c · Vj0 (t1)
+KX
+k=0
+Z t1−t0
+0
+pik
+(t )dt
+> c · Vj0 (t1)
+Vj(t0)
+c · Vj(t1)
+= Vj(t0)
+4
+Assuming LET0 t
+Consequently, the opportunity cost
+PK
+k=0 Vik (t0) of starting the
+execution of methods [mik ]K
+k=0 at time t ∈ [0, .., Δ] is greater
+than the opportunity cost Vj0 (t0) which proves the theorem.Figure
+4 shows that the overestimation of opportunity cost is easily 
+observable in practice.
+To remedy the problem of opportunity cost overestimation, we 
+propose three alternative heuristics that split the opportunity cost 
+functions:
+• Heuristic H 1,0 : Only one method, mik gets the full 
+expected reward for enabling method mj0 , i.e., V j0,ik
+(t) = 0
+for k ∈ {0, ..., K}\{k} and V j0,ik (t) = (Vj0 ·
+Q
+k ∈{0,...,K}
+k =k
+Pik
+)(t).
+• Heuristic H 1/2,1/2 : Each method [mik ]K
+k=0 gets the full
+opportunity cost for enabling method mj0 divided by the
+number K of methods enabling the method mj0 , i.e., V j0,ik (t) =
+1
+K
+(Vj0 ·
+Q
+k ∈{0,...,K}
+k =k
+Pik
+)(t) for k ∈ {0, ..., K}.
+• Heuristic bH 1,1 : This is a normalized version of the H 1,1
+heuristic in that each method [mik ]K
+k=0 initially gets the full
+opportunity cost for enabling the method mj0 . To avoid 
+opportunity cost overestimation, we normalize the split 
+functions when their sum exceeds the opportunity cost function
+to be split. Formally:
+V j0,ik (t) =
+8
+><
+>:
+V
+H 1,1
+j0,ik
+(t) if
+PK
+k=0 V
+H 1,1
+j0,ik
+(t) < Vj0 (t)
+Vj0 (t)
+V
+H 1,1
+j0,ik
+(t)
+PK
+k=0
+V
+H 1,1
+j0,ik
+(t)
+otherwise
+Where V
+H 1,1
+j0,ik
+(t) = (Vj0 ·
+Q
+k ∈{0,...,K}
+k =k
+Pjk
+)(t).
+For the new heuristics, we now prove, that:
+THEOREM 3. Heuristics H 1,0 , H 1/2,1/2 and bH 1,1 do not
+overestimate the opportunity cost.
+PROOF. When heuristic H 1,0 is used to split the opportunity
+cost function Vj0 , only one method (e.g. mik ) gets the opportunity
+cost for enabling method mj0 . Thus:
+KX
+k =0
+Vik
+(t) =
+Z Δ−t
+0
+pik
+(t )Vj0,ik
+(t + t )dt (6)
+And since Vj0 is non-increasing
+≤
+Z Δ−t
+0
+pik
+(t )Vj0 (t + t ) ·
+Y
+k ∈{0,...,K}
+k =k
+Pjk
+(t + t )dt
+≤
+Z Δ−t
+0
+pik
+(t )Vj0 (t + t )dt ≤ Vj0 (t)
+The last inequality is also a consequence of the fact that Vj0 is
+non-increasing.
+For heuristic H 1/2,1/2 we similarly have:
+KX
+k=0
+Vik
+(t) ≤
+KX
+k=0
+Z Δ−t
+0
+pik
+(t )
+1
+K
+Vj0 (t + t )
+Y
+k ∈{0,...,K}
+k =k
+Pjk
+(t + t )dt
+≤
+1
+K
+KX
+k=0
+Z Δ−t
+0
+pik
+(t )Vj0 (t + t )dt
+≤
+1
+K
+· K · Vj0 (t) = Vj0 (t).
+For heuristic bH 1,1 , the opportunity cost function Vj0 is by 
+definition split in such manner, that
+PK
+k=0 Vik (t) ≤ Vj0 (t). 
+Consequently, we have proved, that our new heuristics H 1,0 , H 1/2,1/2
+and bH 1,1 avoid the overestimation of the opportunity cost.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 835
+The reason why we have introduced all three new heuristics is the
+following: Since H 1,1 overestimates the opportunity cost, one
+has to choose which method mik will receive the reward from 
+enabling the method mj0 , which is exactly what the heuristic H 1,0
+does. However, heuristic H 1,0 leaves K − 1 methods that 
+precede the method mj0 without any reward which leads to starvation.
+Starvation can be avoided if opportunity cost functions are split 
+using heuristic H 1/2,1/2 , that provides reward to all enabling 
+methods. However, the sum of split opportunity cost functions for the
+H 1/2,1/2 heuristic can be smaller than the non-zero split 
+opportunity cost function for the H 1,0 heuristic, which is clearly 
+undesirable. Such situation (Figure 4, heuristic H 1,0 ) occurs because
+the mean f+g
+2
+of two functions f, g is not smaller than f nor g
+only if f = g. This is why we have proposed the bH 1,1 heuristic,
+which by definition avoids the overestimation, underestimation and
+starvation problems.
+7. EXPERIMENTAL EVALUATION
+Since the VFP algorithm that we introduced provides two 
+orthogonal improvements over the OC-DEC-MDP algorithm, the 
+experimental evaluation we performed consisted of two parts: In part 1,
+we tested empirically the quality of solutions that an locally optimal
+solver (either OC-DEC-MDP or VFP) finds, given it uses different
+opportunity cost function splitting heuristic, and in part 2, we 
+compared the runtimes of the VFP and OC-DEC- MDP algorithms for
+a variety of mission plan configurations.
+Part 1: We first ran the VFP algorithm on a generic mission plan
+configuration from Figure 3 where only methods mj0 , mi1 , mi2
+and m0 were present. Time windows of all methods were set to
+400, duration pj0 of method mj0 was uniform, i.e., pj0 (t) = 1
+400
+and durations pi1 , pi2 of methods mi1 , mi2 were normal 
+distributions, i.e., pi1 = N(μ = 250, σ = 20), and pi2 = N(μ =
+200, σ = 100). We assumed that only method mj0 provided 
+reward, i.e. rj0 = 10 was the reward for finishing the execution of
+method mj0 before time t = 400. We show our results in Figure
+(4) where the x-axis of each of the graphs represents time whereas
+the y-axis represents the opportunity cost. The first graph confirms,
+that when the opportunity cost function Vj0 was split into 
+opportunity cost functions Vi1 and Vi2 using the H 1,1 heuristic, the 
+function Vi1 +Vi2 was not always below the Vj0 function. In particular,
+Vi1 (280) + Vi2 (280) exceeded Vj0 (280) by 69%. When 
+heuristics H 1,0 , H 1/2,1/2 and bH 1,1 were used (graphs 2,3 and 4),
+the function Vi1 + Vi2 was always below Vj0 .
+We then shifted our attention to the civilian rescue domain 
+introduced in Figure 1 for which we sampled all action execution 
+durations from the normal distribution N = (μ = 5, σ = 2)). To
+obtain the baseline for the heuristic performance, we implemented
+a globally optimal solver, that found a true expected total reward
+for this domain (Figure (6a)). We then compared this reward with
+a expected total reward found by a locally optimal solver guided
+by each of the discussed heuristics. Figure (6a), which plots on
+the y-axis the expected total reward of a policy complements our
+previous results: H 1,1 heuristic overestimated the expected total
+reward by 280% whereas the other heuristics were able to guide the
+locally optimal solver close to a true expected total reward.
+Part 2: We then chose H 1,1 to split the opportunity cost 
+functions and conducted a series of experiments aimed at testing the
+scalability of VFP for various mission plan configurations, using
+the performance of the OC-DEC-MDP algorithm as a benchmark.
+We began the VFP scalability tests with a configuration from Figure
+(5a) associated with the civilian rescue domain, for which method
+execution durations were extended to normal distributions N(μ =
+Figure 5: Mission plan configurations: (a) civilian rescue 
+domain, (b) chain of n methods, (c) tree of n methods with
+branching factor = 3 and (d) square mesh of n methods.
+Figure 6: VFP performance in the civilian rescue domain.
+30, σ = 5), and the deadline was extended to Δ = 200.
+We decided to test the runtime of the VFP algorithm running with
+three different levels of accuracy, i.e., different approximation 
+parameters P and V were chosen, such that the cumulative error
+of the solution found by VFP stayed within 1%, 5% and 10% of
+the solution found by the OC- DEC-MDP algorithm. We then run
+both algorithms for a total of 100 policy improvement iterations.
+Figure (6b) shows the performance of the VFP algorithm in the
+civilian rescue domain (y-axis shows the runtime in milliseconds).
+As we see, for this small domain, VFP runs 15% faster than 
+OCDEC-MDP when computing the policy with an error of less than
+1%. For comparison, the globally optimal solved did not terminate
+within the first three hours of its runtime which shows the strength
+of the opportunistic solvers, like OC-DEC-MDP.
+We next decided to test how VFP performs in a more difficult 
+domain, i.e., with methods forming a long chain (Figure (5b)). We
+tested chains of 10, 20 and 30 methods, increasing at the same
+time method time windows to 350, 700 and 1050 to ensure that
+later methods can be reached. We show the results in Figure (7a),
+where we vary on the x-axis the number of methods and plot on
+the y-axis the algorithm runtime (notice the logarithmic scale). As
+we observe, scaling up the domain reveals the high performance of
+VFP: Within 1% error, it runs up to 6 times faster than 
+OC-DECMDP.
+We then tested how VFP scales up, given that the methods are 
+arranged into a tree (Figure (5c)). In particular, we considered trees
+with branching factor of 3, and depth of 2, 3 and 4, increasing at
+the same time the time horizon from 200 to 300, and then to 400.
+We show the results in Figure (7b). Although the speedups are
+smaller than in case of a chain, the VFP algorithm still runs up to 4
+times faster than OC-DEC-MDP when computing the policy with
+an error of less than 1%.
+We finally tested how VFP handles the domains with methods 
+arranged into a n × n mesh, i.e., C≺ = { mi,j, mk,j+1 } for i =
+1, ..., n; k = 1, ..., n; j = 1, ..., n − 1. In particular, we consider
+836 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+Figure 4: Visualization of heuristics for opportunity costs splitting.
+Figure 7: Scalability experiments for OC-DEC-MDP and VFP for different network configurations.
+meshes of 3×3, 4×4, and 5×5 methods. For such configurations
+we have to greatly increase the time horizon since the 
+probabilities of enabling the final methods by a particular time decrease
+exponentially. We therefore vary the time horizons from 3000 to
+4000, and then to 5000. We show the results in Figure (7c) where,
+especially for larger meshes, the VFP algorithm runs up to one 
+order of magnitude faster than OC-DEC-MDP while finding a policy
+that is within less than 1% from the policy found by OC- 
+DECMDP.
+8. CONCLUSIONS
+Decentralized Markov Decision Process (DEC-MDP) has been very
+popular for modeling of agent-coordination problems, it is very 
+difficult to solve, especially for the real-world domains. In this 
+paper, we improved a state-of-the-art heuristic solution method for
+DEC-MDPs, called OC-DEC-MDP, that has recently been shown
+to scale up to large DEC-MDPs. Our heuristic solution method,
+called Value Function Propagation (VFP), provided two 
+orthogonal improvements of OC-DEC-MDP: (i) It speeded up 
+OC-DECMDP by an order of magnitude by maintaining and manipulating a
+value function for each method rather than a separate value for each
+pair of method and time interval, and (ii) it achieved better solution
+qualities than OC-DEC-MDP because it corrected the 
+overestimation of the opportunity cost of OC-DEC-MDP.
+In terms of related work, we have extensively discussed the 
+OCDEC-MDP algorithm [4]. Furthermore, as discussed in Section 4,
+there are globally optimal algorithms for solving DEC-MDPs with
+temporal constraints [1] [11]. Unfortunately, they fail to scale up to
+large-scale domains at present time. Beyond OC-DEC-MDP, there
+are other locally optimal algorithms for DEC-MDPs and 
+DECPOMDPs [8] [12], [13], yet, they have traditionally not dealt with
+uncertain execution times and temporal constraints. Finally, value
+function techniques have been studied in context of single agent
+MDPs [7] [9]. However, similarly to [6], they fail to address the
+lack of global state knowledge, which is a fundamental issue in
+decentralized planning.
+Acknowledgments
+This material is based upon work supported by the DARPA/IPTO
+COORDINATORS program and the Air Force Research 
+Laboratory under Contract No. FA875005C0030. The authors also want
+to thank Sven Koenig and anonymous reviewers for their valuable
+comments.
+9. REFERENCES
+[1] R. Becker, V. Lesser, and S. Zilberstein. Decentralized MDPs with
+Event-Driven Interactions. In AAMAS, pages 302-309, 2004.
+[2] R. Becker, S. Zilberstein, V. Lesser, and C. V. Goldman.
+Transition-Independent Decentralized Markov Decision Processes. In
+AAMAS, pages 41-48, 2003.
+[3] D. S. Bernstein, S. Zilberstein, and N. Immerman. The complexity of
+decentralized control of Markov decision processes. In UAI, pages
+32-37, 2000.
+[4] A. Beynier and A. Mouaddib. A polynomial algorithm for
+decentralized Markov decision processes with temporal constraints.
+In AAMAS, pages 963-969, 2005.
+[5] A. Beynier and A. Mouaddib. An iterative algorithm for solving
+constrained decentralized Markov decision processes. In AAAI, pages
+1089-1094, 2006.
+[6] C. Boutilier. Sequential optimality and coordination in multiagent
+systems. In IJCAI, pages 478-485, 1999.
+[7] J. Boyan and M. Littman. Exact solutions to time-dependent MDPs.
+In NIPS, pages 1026-1032, 2000.
+[8] C. Goldman and S. Zilberstein. Optimizing information exchange in
+cooperative multi-agent systems, 2003.
+[9] L. Li and M. Littman. Lazy approximation for solving continuous
+finite-horizon MDPs. In AAAI, pages 1175-1180, 2005.
+[10] Y. Liu and S. Koenig. Risk-sensitive planning with one-switch utility
+functions: Value iteration. In AAAI, pages 993-999, 2005.
+[11] D. Musliner, E. Durfee, J. Wu, D. Dolgov, R. Goldman, and
+M. Boddy. Coordinated plan management using multiagent MDPs. In
+AAAI Spring Symposium, 2006.
+[12] R. Nair, M. Tambe, M. Yokoo, D. Pynadath, and S. Marsella. Taming
+decentralized POMDPs: Towards efficient policy computation for
+multiagent settings. In IJCAI, pages 705-711, 2003.
+[13] R. Nair, P. Varakantham, M. Tambe, and M. Yokoo. Networked
+distributed POMDPs: A synergy of distributed constraint
+optimization and POMDPs. In IJCAI, pages 1758-1760, 2005.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 837

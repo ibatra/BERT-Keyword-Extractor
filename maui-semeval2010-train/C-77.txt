@@ -1,0 +1,1187 @@
+Tracking Immediate Predecessors
+in Distributed Computations
+Emmanuelle Anceaume Jean-Michel H´elary Michel Raynal
+IRISA, Campus Beaulieu
+35042 Rennes Cedex, France
+FirstName.LastName@irisa.fr
+ABSTRACT
+A distributed computation is usually modeled as a partially
+ordered set of relevant events (the relevant events are a 
+subset of the primitive events produced by the computation).
+An important causality-related distributed computing 
+problem, that we call the Immediate Predecessors Tracking (IPT)
+problem, consists in associating with each relevant event, on
+the fly and without using additional control messages, the
+set of relevant events that are its immediate predecessors in
+the partial order. So, IPT is the on-the-fly computation of
+the transitive reduction (i.e., Hasse diagram) of the causality
+relation defined by a distributed computation. This paper
+addresses the IPT problem: it presents a family of 
+protocols that provides each relevant event with a timestamp that
+exactly identifies its immediate predecessors. The family is
+defined by a general condition that allows application 
+messages to piggyback control information whose size can be
+smaller than n (the number of processes). In that sense,
+this family defines message size-efficient IPT protocols. 
+According to the way the general condition is implemented,
+different IPT protocols can be obtained. Two of them are
+exhibited.
+Categories and Subject Descriptors
+C.2.4 [Distributed Systems]:
+General Terms
+Asynchronous Distributed Computations
+1. INTRODUCTION
+A distributed computation consists of a set of processes
+that cooperate to achieve a common goal. A main 
+characteristic of these computations lies in the fact that the
+processes do not share a common global memory, and 
+communicate only by exchanging messages over a 
+communication network. Moreover, message transfer delays are finite
+but unpredictable. This computation model defines what
+is known as the asynchronous distributed system model. It
+is particularly important as it includes systems that span
+large geographic areas, and systems that are subject to 
+unpredictable loads. Consequently, the concepts, tools and
+mechanisms developed for asynchronous distributed systems
+reveal to be both important and general.
+Causality is a key concept to understand and master the
+behavior of asynchronous distributed systems [18]. More
+precisely, given two events e and f of a distributed 
+computation, a crucial problem that has to be solved in a lot of
+distributed applications is to know whether they are causally
+related, i.e., if the occurrence of one of them is a consequence
+of the occurrence of the other. The causal past of an event
+e is the set of events from which e is causally dependent.
+Events that are not causally dependent are said to be 
+concurrent. Vector clocks [5, 16] have been introduced to allow
+processes to track causality (and concurrency) between the
+events they produce. The timestamp of an event produced
+by a process is the current value of the vector clock of the
+corresponding process. In that way, by associating vector
+timestamps with events it becomes possible to safely decide
+whether two events are causally related or not.
+Usually, according to the problem he focuses on, a 
+designer is interested only in a subset of the events produced by
+a distributed execution (e.g., only the checkpoint events are
+meaningful when one is interested in determining 
+consistent global checkpoints [12]). It follows that detecting causal
+dependencies (or concurrency) on all the events of the 
+distributed computation is not desirable in all applications [7,
+15]. In other words, among all the events that may occur
+in a distributed computation, only a subset of them are 
+relevant. In this paper, we are interested in the restriction of
+the causality relation to the subset of events defined as being
+the relevant events of the computation.
+Being a strict partial order, the causality relation is 
+transitive. As a consequence, among all the relevant events that
+causally precede a given relevant event e, only a subset are
+its immediate predecessors: those are the events f such that
+there is no relevant event on any causal path from f to e.
+Unfortunately, given only the vector timestamp associated
+with an event it is not possible to determine which events of
+its causal past are its immediate predecessors. This comes
+from the fact that the vector timestamp associated with e
+determines, for each process, the last relevant event 
+belong210
+ing to the causal past of e, but such an event is not 
+necessarily an immediate predecessor of e. However, some 
+applications [4, 6] require to associate with each relevant event only
+the set of its immediate predecessors. Those applications are
+mainly related to the analysis of distributed computations.
+Some of those analyses require the construction of the 
+lattice of consistent cuts produced by the computation [15, 16].
+It is shown in [4] that the tracking of immediate 
+predecessors allows an efficient on the fly construction of this lattice.
+More generally, these applications are interested in the very
+structure of the causal past. In this context, the 
+determination of the immediate predecessors becomes a major issue
+[6]. Additionally, in some circumstances, this determination
+has to satisfy behavior constraints. If the communication
+pattern of the distributed computation cannot be modified,
+the determination has to be done without adding control
+messages. When the immediate predecessors are used to
+monitor the computation, it has to be done on the fly.
+We call Immediate Predecessor Tracking (IPT) the 
+problem that consists in determining on the fly and without
+additional messages the immediate predecessors of relevant
+events. This problem consists actually in determining the
+transitive reduction (Hasse diagram) of the causality graph
+generated by the relevant events of the computation. 
+Solving this problem requires tracking causality, hence using 
+vector clocks. Previous works have addressed the efficient 
+implementation of vector clocks to track causal dependence on
+relevant events. Their aim was to reduce the size of 
+timestamps attached to messages. An efficient vector clock 
+implementation suited to systems with fifo channels is proposed
+in [19]. Another efficient implementation that does not 
+depend on channel ordering property is described in [11]. The
+notion of causal barrier is introduced in [2, 17] to reduce
+the size of control information required to implement causal
+multicast. However, none of these papers considers the 
+IPT problem. This problem has been addressed for the first
+time (to our knowledge) in [4, 6] where an IPT protocol
+is described, but without correctness proof. Moreover, in
+this protocol, timestamps attached to messages are of size
+n. This raises the following question which, to our 
+knowledge, has never been answered: Are there efficient vector
+clock implementation techniques that are suitable for the IPT
+problem?.
+This paper has three main contributions: (1) a positive
+answer to the previous open question, (2) the design of a
+family of efficient IPT protocols, and (3) a formal 
+correctness proof of the associated protocols. From a 
+methodological point of view the paper uses a top-down approach. It
+states abstract properties from which more concrete 
+properties and protocols are derived. The family of IPT 
+protocols is defined by a general condition that allows 
+application messages to piggyback control information whose size
+can be smaller than the system size (i.e., smaller than the
+number of processes composing the system). In that sense,
+this family defines low cost IPT protocols when we 
+consider the message size. In addition to efficiency, the proposed
+approach has an interesting design property. Namely, the
+family is incrementally built in three steps. The basic 
+vector clock protocol is first enriched by adding to each process
+a boolean vector whose management allows the processes
+to track the immediate predecessor events. Then, a general
+condition is stated to reduce the size of the control 
+information carried by messages. Finally, according to the way this
+condition is implemented, three IPT protocols are obtained.
+The paper is composed of seven sections. Sections 2 
+introduces the computation model, vector clocks and the notion
+of relevant events. Section 3 presents the first step of the
+construction that results in an IPT protocol in which each
+message carries a vector clock and a boolean array, both
+of size n (the number of processes). Section 4 improves
+this protocol by providing the general condition that allows
+a message to carry control information whose size can be
+smaller than n. Section 5 provides instantiations of this
+condition. Section 6 provides a simulation study comparing
+the behaviors of the proposed protocols. Finally, Section 7
+concludes the paper. (Due to space limitations, proofs of
+lemmas and theorems are omitted. They can be found in
+[1].)
+2. MODEL AND VECTOR CLOCK
+2.1 Distributed Computation
+A distributed program is made up of sequential local 
+programs which communicate and synchronize only by 
+exchanging messages. A distributed computation describes the 
+execution of a distributed program. The execution of a local
+program gives rise to a sequential process. Let {P1, P2, . . . ,
+Pn} be the finite set of sequential processes of the distributed
+computation. Each ordered pair of communicating processes
+(Pi, Pj ) is connected by a reliable channel cij through which
+Pi can send messages to Pj. We assume that each message
+is unique and a process does not send messages to itself1
+.
+Message transmission delays are finite but unpredictable.
+Moreover, channels are not necessarily fifo. Process speeds
+are positive but arbitrary. In other words, the underlying
+computation model is asynchronous.
+The local program associated with Pi can include send,
+receive and internal statements. The execution of such a
+statement produces a corresponding send/receive/internal
+event. These events are called primitive events. Let ex
+i
+be the x-th event produced by process Pi. The sequence
+hi = e1
+i e2
+i . . . ex
+i . . . constitutes the history of Pi, denoted
+Hi. Let H = ∪n
+i=1Hi be the set of events produced by a
+distributed computation. This set is structured as a partial
+order by Lamport"s happened before relation [14] (denoted
+hb
+→) and defined as follows: ex
+i
+hb
+→ ey
+j if and only if
+(i = j ∧ x + 1 = y) (local precedence) ∨
+(∃m : ex
+i = send(m) ∧ ey
+j = receive(m)) (msg prec.) ∨
+(∃ ez
+k : ex
+i
+hb
+→ ez
+k ∧ e z
+k
+hb
+→ ey
+j ) (transitive closure).
+max(ex
+i , ey
+j ) is a partial function defined only when ex
+i and
+ey
+j are ordered. It is defined as follows: max(ex
+i , ey
+j ) = ex
+i if
+ey
+j
+hb
+→ ex
+i , max(ex
+i , ey
+j ) = ey
+i if ex
+i
+hb
+→ ey
+j .
+Clearly the restriction of
+hb
+→ to Hi, for a given i, is a total
+order. Thus we will use the notation ex
+i < ey
+i iff x < y.
+Throughout the paper, we will use the following notation:
+if e ∈ Hi is not the first event produced by Pi, then pred(e)
+denotes the event immediately preceding e in the sequence
+Hi. If e is the first event produced by Pi, then pred(e) is
+denoted by ⊥ (meaning that there is no such event), and
+∀e ∈ Hi : ⊥ < e. The partial order bH = (H,
+hb
+→) 
+constitutes a formal model of the distributed computation it is
+associated with.
+1
+This assumption is only in order to get simple protocols.
+211
+P1
+P2
+P3
+[1, 1, 2]
+[1, 0, 0] [3, 2, 1]
+[1, 1, 0]
+(2, 1)
+[0, 0, 1]
+(3, 1)
+[2, 0, 1]
+(1, 1) (1, 3)(1, 2)
+(2, 2) (2, 3)
+(3, 2)
+[2, 2, 1] [2, 3, 1]
+(1, 1) (1, 2) (1, 3)
+(2, 1)
+(2, 2)
+(2, 3)
+(3, 1)
+(3, 2)
+Figure 1: Timestamped Relevant Events and Immediate Predecessors Graph (Hasse Diagram)
+2.2 Relevant Events
+For a given observer of a distributed computation, only
+some events are relevant2
+[7, 9, 15]. An interesting example
+of what an observation is, is the detection of predicates
+on consistent global states of a distributed computation [3,
+6, 8, 9, 13, 15]. In that case, a relevant event corresponds
+to the modification of a local variable involved in the global
+predicate. Another example is the checkpointing problem
+where a relevant event is the definition of a local checkpoint
+[10, 12, 20].
+The left part of Figure 1 depicts a distributed computation
+using the classical space-time diagram. In this figure, only
+relevant events are represented. The sequence of relevant
+events produced by process Pi is denoted by Ri, and R =
+∪n
+i=1Ri ⊆ H denotes the set of all relevant events. Let →
+be the relation on R defined in the following way:
+∀ (e, f) ∈ R × R : (e → f) ⇔ (e
+hb
+→ f).
+The poset (R, →) constitutes an abstraction of the 
+distributed computation [7]. In the following we consider a
+distributed computation at such an abstraction level. 
+Moreover, without loss of generality we consider that the set of
+relevant events is a subset of the internal events (if a 
+communication event has to be observed, a relevant internal event
+can be generated just before a send and just after a receive
+communication event occurred). Each relevant event is 
+identified by a pair (process id, sequence number) (see Figure 1).
+Definition 1. The relevant causal past of an event e ∈
+H is the (partially ordered) subset of relevant events f such
+that f
+hb
+→ e. It is denoted ↑ (e). We have ↑ (e) = {f ∈
+R | f
+hb
+→ e}.
+Note that, if e ∈ R then ↑ (e) = {f ∈ R | f → e}. In
+the computation described in Figure 1, we have, for the
+event e identified (2, 2): ↑ (e) = {(1, 1), (1, 2), (2, 1), (3, 1)}.
+The following properties are immediate consequences of the
+previous definitions. Let e ∈ H.
+CP1 If e is not a receive event then
+↑ (e) =
+8
+<
+:
+∅ if pred(e) = ⊥,
+↑ (pred(e)) ∪ {pred(e)} if pred(e) ∈ R,
+↑ (pred(e)) if pred(e) ∈ R.
+CP2 If e is a receive event (of a message m) then
+↑ (e) =
+8
+>><
+>>:
+↑ (send(m)) if pred(e) = ⊥,
+↑ (pred(e))∪ ↑ (send(m)) ∪ {pred(e)}
+if pred(e) ∈ R,
+↑ (pred(e))∪ ↑ (send(m)) if pred(e) ∈ R.
+2
+Those events are sometimes called observable events.
+Definition 2. Let e ∈ Hi. For every j such that ↑ (e) ∩
+Rj = ∅, the last relevant event of Pj with respect to e is:
+lastr(e, j) = max{f | f ∈↑ (e) ∩ Rj}. When ↑ (e) ∩ Rj = ∅,
+lastr(e, j) is denoted by ⊥ (meaning that there is no such
+event).
+Let us consider the event e identified (2,2) in Figure 1. We
+have lastr(e, 1) = (1, 2), lastr(e, 2) = (2, 1), lastr(e, 3) =
+(3, 1). The following properties relate the events lastr(e, j)
+and lastr(f, j) for all the predecessors f of e in the relation
+hb
+→. These properties follow directly from the definitions.
+Let e ∈ Hi.
+LR0 ∀e ∈ Hi:
+lastr(e, i) =
+8
+<
+:
+⊥ if pred(e) = ⊥,
+pred(e) if pred(e) ∈ R,
+lastr(pred(e),i) if pred(e) ∈ R.
+LR1 If e is not a receipt event: ∀j = i :
+lastr(e, j) = lastr(pred(e),j).
+LR2 If e is a receive event of m: ∀j = i :
+lastr(e, j) = max(lastr(pred(e),j), lastr(send(m),j)).
+2.3 Vector Clock System
+Definition As a fundamental concept associated with the
+causality theory, vector clocks have been introduced in 1988,
+simultaneously and independently by Fidge [5] and Mattern
+[16]. A vector clock system is a mechanism that associates
+timestamps with events in such a way that the 
+comparison of their timestamps indicates whether the 
+corresponding events are or are not causally related (and, if they are,
+which one is the first). More precisely, each process Pi has a
+vector of integers V Ci[1..n] such that V Ci[j] is the number
+of relevant events produced by Pj, that belong to the 
+current relevant causal past of Pi. Note that V Ci[i] counts the
+number of relevant events produced so far by Pi. When a
+process Pi produces a (relevant) event e, it associates with
+e a vector timestamp whose value (denoted e.V C) is equal
+to the current value of V Ci.
+Vector Clock Implementation The following 
+implementation of vector clocks [5, 16] is based on the observation
+that ∀i, ∀e ∈ Hi, ∀j : e.V Ci[j] = y ⇔ lastr(e, j) = ey
+j
+where e.V Ci is the value of V Ci just after the occurrence
+of e (this relation results directly from the properties LR0,
+LR1, and LR2). Each process Pi manages its vector clock
+V Ci[1..n] according to the following rules:
+VC0 V Ci[1..n] is initialized to [0, . . . , 0].
+VC1 Each time it produces a relevant event e, Pi increments
+its vector clock entry V Ci[i] (V Ci[i] := V Ci[i] + 1) to
+212
+indicate it has produced one more relevant event, then
+Pi associates with e the timestamp e.V C = V Ci.
+VC2 When a process Pi sends a message m, it attaches to
+m the current value of V Ci. Let m.V C denote this
+value.
+VC3 When Pi receives a message m, it updates its vector
+clock as follows: ∀k : V Ci[k] := max(V Ci[k], m.V C[k]).
+3. IMMEDIATE PREDECESSORS
+In this section, the Immediate Predecessor Tracking 
+(IPT) problem is stated (Section 3.1). Then, some technical
+properties of immediate predecessors are stated and proved
+(Section 3.2). These properties are used to design the basic
+IPT protocol and prove its correctness (Section 3.3). This
+IPT protocol, previously presented in [4] without proof, is
+built from a vector clock protocol by adding the 
+management of a local boolean array at each process.
+3.1 The IPT Problem
+As indicated in the introduction, some applications (e.g.,
+analysis of distributed executions [6], detection of 
+distributed properties [7]) require to determine (on-the-fly and 
+without additional messages) the transitive reduction of the 
+relation → (i.e., we must not consider transitive causal 
+dependency). Given two relevant events f and e, we say that f
+is an immediate predecessor of e if f → e and there is no
+relevant event g such that f → g → e.
+Definition 3. The Immediate Predecessor Tracking 
+(IPT) problem consists in associating with each relevant event
+e the set of relevant events that are its immediate 
+predecessors. Moreover, this has to be done on the fly and without
+additional control message (i.e., without modifying the 
+communication pattern of the computation).
+As noted in the Introduction, the IPT problem is the 
+computation of the Hasse diagram associated with the partially
+ordered set of the relevant events produced by a distributed
+computation.
+3.2 Formal Properties of IPT
+In order to design a protocol solving the IPT problem, it
+is useful to consider the notion of immediate relevant 
+predecessor of any event, whether relevant or not. First, we
+observe that, by definition, the immediate predecessor on
+Pj of an event e is necessarily the lastr(e, j) event. 
+Second, for lastr(e, j) to be immediate predecessor of e, there
+must not be another lastr(e, k) event on a path between
+lastr(e, j) and e. These observations are formalized in the
+following definition:
+Definition 4. Let e ∈ Hi. The set of immediate 
+relevant predecessors of e (denoted IP(e)), is the set of the relevant
+events lastr(e, j) (j = 1, . . . , n) such that ∀k : lastr(e, j) ∈↑
+(lastr(e, k)).
+It follows from this definition that IP(e) ⊆ {lastr(e, j)|j =
+1, . . . , n} ⊂↑ (e). When we consider Figure 1, The graph 
+depicted in its right part describes the immediate predecessors
+of the relevant events of the computation defined in its left
+part, more precisely, a directed edge (e, f) means that the
+relevant event e is an immediate predecessor of the relevant
+event f (3
+).
+The following lemmas show how the set of immediate 
+predecessors of an event is related to those of its predecessors
+in the relation
+hb
+→. They will be used to design and prove
+the protocols solving the IPT problem. To ease the reading
+of the paper, their proofs are presented in Appendix A.
+The intuitive meaning of the first lemma is the following:
+if e is not a receive event, all the causal paths arriving at e
+have pred(e) as next-to-last event (see CP1). So, if pred(e)
+is a relevant event, all the relevant events belonging to its
+relevant causal past are separated from e by pred(e), and
+pred(e) becomes the only immediate predecessor of e. In
+other words, the event pred(e) constitutes a reset w.r.t.
+the set of immediate predecessors of e. On the other hand,
+if pred(e) is not relevant, it does not separate its relevant
+causal past from e.
+Lemma 1. If e is not a receive event, IP(e) is equal to:
+∅ if pred(e) = ⊥,
+{pred(e)} if pred(e) ∈ R,
+IP(pred(e)) if pred(e) ∈ R.
+The intuitive meaning of the next lemma is as follows: if
+e is a receive event receive(m), the causal paths arriving
+at e have either pred(e) or send(m) as next-to-last events.
+If pred(e) is relevant, as explained in the previous lemma,
+this event hides from e all its relevant causal past and
+becomes an immediate predecessor of e. Concerning the
+last relevant predecessors of send(m), only those that are
+not predecessors of pred(e) remain immediate predecessors
+of e.
+Lemma 2. Let e ∈ Hi be the receive event of a message
+m. If pred(e) ∈ Ri, then, ∀j, IP(e) ∩ Rj is equal to:
+{pred(e)} if j = i,
+∅ if lastr(pred(e),j) ≥ lastr(send(m),j),
+IP(send(m)) ∩ Rj if lastr(pred(e),j) < lastr(send(m),j).
+The intuitive meaning of the next lemma is the following:
+if e is a receive event receive(m), and pred(e) is not 
+relevant, the last relevant events in the relevant causal past of e are
+obtained by merging those of pred(e) and those of send(m)
+and by taking the latest on each process. So, the 
+immediate predecessors of e are either those of pred(e) or those
+of send(m). On a process where the last relevant events
+of pred(e) and of send(m) are the same event f, none of
+the paths from f to e must contain another relevant event,
+and thus, f must be immediate predecessor of both events
+pred(e) and send(m).
+Lemma 3. Let e ∈ Hi be the receive event of a message
+m. If pred(e) ∈ Ri, then, ∀j, IP(e) ∩ Rj is equal to:
+IP(pred(e)) ∩ Rj if lastr(pred(e),j) > lastr(send(m),j),
+IP(send(m)) ∩ Rj if lastr(pred(e),j) < lastr(send(m),j)
+IP(pred(e))∩IP(send(m))∩Rj if lastr(pred(e),j) = lastr
+(send(m), j).
+3.3 A Basic IPT Protocol
+The basic protocol proposed here associates with each 
+relevant event e, an attribute encoding the set IP(e) of its
+immediate predecessors. From the previous lemmas, the set
+3
+Actually, this graph is the Hasse diagram of the partial
+order associated with the distributed computation.
+213
+IP(e) of any event e depends on the sets IP of the events
+pred(e) and/or send(m) (when e = receive(m)). Hence the
+idea to introduce a data structure allowing to manage the
+sets IPs inductively on the poset (H,
+hb
+→). To take into 
+account the information from pred(e), each process manages
+a boolean array IPi such that, ∀e ∈ Hi the value of IPi
+when e occurs (denoted e.IPi) is the boolean array 
+representation of the set IP(e). More precisely, ∀j : IPi[j] =
+1 ⇔ lastr(e, j) ∈ IP(e). As recalled in Section 2.3, the
+knowledge of lastr(e,j) (for every e and every j) is based
+on the management of vectors V Ci. Thus, the set IP(e) is
+determined in the following way:
+IP(e) = {ey
+j | e.V Ci[j] = y ∧ e.IPi[j] = 1, j = 1, . . . , n}
+Each process Pi updates IPi according to the Lemmas 1,
+2, and 3:
+1. It results from Lemma 1 that, if e is not a receive event,
+the current value of IPi is sufficient to determine e.IPi.
+It results from Lemmas 2 and 3 that, if e is a receive
+event (e = receive(m)), then determining e.IPi 
+involves information related to the event send(m). More
+precisely, this information involves IP(send(m)) and
+the timestamp of send(m) (needed to compare the
+events lastr(send(m),j) and lastr(pred(e),j), for 
+every j). So, both vectors send(m).V Cj and send(m).IPj
+(assuming send(m) produced by Pj ) are attached to
+message m.
+2. Moreover, IPi must be updated upon the occurrence
+of each event. In fact, the value of IPi just after an
+event e is used to determine the value succ(e).IPi. In
+particular, as stated in the Lemmas, the determination
+of succ(e).IPi depends on whether e is relevant or not.
+Thus, the value of IPi just after the occurrence of event
+e must  keep track of this event.
+The following protocol, previously presented in [4] without
+proof, ensures the correct management of arrays V Ci (as in
+Section 2.3) and IPi (according to the Lemmas of Section
+3.2). The timestamp associated with a relevant event e is
+denoted e.TS.
+R0 Initialization: Both V Ci[1..n] and IPi[1..n] are 
+initialized to [0, . . . , 0].
+R1 Each time it produces a relevant event e:
+- Pi associates with e the timestamp e.TS defined
+as follows e.TS = {(k, V Ci[k]) | IPi[k] = 1},
+- Pi increments its vector clock entry V Ci[i] 
+(namely it executes V Ci[i] := V Ci[i] + 1),
+- Pi resets IPi: ∀ = i : IPi[ ] := 0; IPi[i] := 1.
+R2 When Pi sends a message m to Pj, it attaches to m
+the current values of V Ci (denoted m.V C) and the
+boolean array IPi (denoted m.IP).
+R3 When it receives a message m from Pj , Pi executes the
+following updates:
+∀k ∈ [1..n] : case
+V Ci[k] < m.V C[k] thenV Ci[k] := m.V C[k];
+IPi[k] := m.IP[k]
+V Ci[k] = m.V C[k] then IPi[k] := min(IPi[k], m.IP[k])
+V Ci[k] > m.V C[k] then skip
+endcase
+The proof of the following theorem directly follows from
+Lemmas 1, 2 and 3.
+Theorem 1. The protocol described in Section 3.3 solves
+the IPT problem: for any relevant event e, the timestamp
+e.TS contains the identifiers of all its immediate 
+predecessors and no other event identifier.
+4. A GENERAL CONDITION
+This section addresses a previously open problem, 
+namely, How to solve the IPT problem without requiring each
+application message to piggyback a whole vector clock and
+a whole boolean array?. First, a general condition that
+characterizes which entries of vectors V Ci and IPi can be
+omitted from the control information attached to a message
+sent in the computation, is defined (Section 4.1). It is then
+shown (Section 4.2) that this condition is both sufficient and
+necessary.
+However, this general condition cannot be locally 
+evaluated by a process that is about to send a message. Thus,
+locally evaluable approximations of this general condition
+must be defined. To each approximation corresponds a 
+protocol, implemented with additional local data structures. In
+that sense, the general condition defines a family of IPT 
+protocols, that solve the previously open problem. This issue
+is addressed in Section 5.
+4.1 To Transmit or Not to Transmit Control
+Information
+Let us consider the previous IPT protocol (Section 3.3).
+Rule R3 shows that a process Pj does not systematically
+update each entry V Cj[k] each time it receives a message
+m from a process Pi: there is no update of V Cj[k] when
+V Cj[k] ≥ m.V C[k]. In such a case, the value m.V C[k] is
+useless, and could be omitted from the control information
+transmitted with m by Pi to Pj.
+Similarly, some entries IPj[k] are not updated when a
+message m from Pi is received by Pj. This occurs when
+0 < V Cj[k] = m.V C[k] ∧ m.IP[k] = 1, or when V Cj [k] >
+m.V C[k], or when m.V C[k] = 0 (in the latest case, as
+m.IP[k] = IPi[k] = 0 then no update of IPj[k] is necessary).
+Differently, some other entries are systematically reset to 0
+(this occurs when 0 < V Cj [k] = m.V C[k] ∧ m.IP[k] = 0).
+These observations lead to the definition of the condition
+K(m, k) that characterizes which entries of vectors V Ci and
+IPi can be omitted from the control information attached
+to a message m sent by a process Pi to a process Pj:
+Definition 5. K(m, k) ≡
+(send(m).V Ci[k] = 0)
+∨ (send(m).V Ci[k] < pred(receive(m)).V Cj[k])
+∨
+;
+(send(m).V Ci[k] = pred(receive(m)).V Cj[k])
+∧(send(m).IPi[k] = 1) .
+4.2 A Necessary and Sufficient Condition
+We show here that the condition K(m, k) is both 
+necessary and sufficient to decide which triples of the form
+(k, send(m).V Ci[k], send(m).IPi[k]) can be omitted in an
+outgoing message m sent by Pi to Pj. A triple attached to
+m will also be denoted (k, m.V C[k], m.IP[k]). Due to space
+limitations, the proofs of Lemma 4 and Lemma 5 are given
+in [1]. (The proof of Theorem 2 follows directly from these
+lemmas.)
+214
+Lemma 4. (Sufficiency) If K(m, k) is true, then the triple
+(k, m.V C[k], m.IP[k]) is useless with respect to the correct
+management of IPj[k] and V Cj [k].
+Lemma 5. (Necessity) If K(m, k) is false, then the triple
+(k, m.V C[k], m.IP[k]) is necessary to ensure the correct 
+management of IPj[k] and V Cj [k].
+Theorem 2. When a process Pi sends m to a process Pj,
+the condition K(m, k) is both necessary and sufficient not to
+transmit the triple (k, send(m).V Ci[k], send(m).IPi[k]).
+5. A FAMILY OF IPT PROTOCOLS BASED
+ON EVALUABLE CONDITIONS
+It results from the previous theorem that, if Pi could
+evaluate K(m, k) when it sends m to Pj, this would 
+allow us improve the previous IPT protocol in the following
+way: in rule R2, the triple (k, V Ci[k], IPi[k]) is 
+transmitted with m only if ¬K(m, k). Moreover, rule R3 is 
+appropriately modified to consider only triples carried by m.
+However, as previously mentioned, Pi cannot locally 
+evaluate K(m, k) when it is about to send m. More 
+precisely, when Pi sends m to Pj , Pi knows the exact values of
+send(m).V Ci[k] and send(m).IPi[k] (they are the current
+values of V Ci[k] and IPi[k]). But, as far as the value of
+pred(receive(m)).V Cj[k] is concerned, two cases are 
+possible. Case (i): If pred(receive(m))
+hb
+→ send(m), then Pi can
+know the value of pred(receive(m)).V Cj[k] and 
+consequently can evaluate K(m, k). Case (ii): If pred(receive(m))
+and send(m) are concurrent, Pi cannot know the value of
+pred(receive(m)).V Cj[k] and consequently cannot evaluate
+K(m, k). Moreover, when it sends m to Pj , whatever the
+case (i or ii) that actually occurs, Pi has no way to know
+which case does occur. Hence the idea to define evaluable
+approximations of the general condition. Let K (m, k) be
+an approximation of K(m, k), that can be evaluated by a
+process Pi when it sends a message m. To be correct, the
+condition K must ensure that, every time Pi should 
+transmit a triple (k, V Ci[k], IPi[k]) according to Theorem 2 (i.e.,
+each time ¬K(m, k)), then Pi transmits this triple when it
+uses condition K . Hence, the definition of a correct 
+evaluable approximation:
+Definition 6. A condition K , locally evaluable by a 
+process when it sends a message m to another process, is 
+correct if ∀(m, k) : ¬K(m, k) ⇒ ¬K (m, k) or, equivalently,
+∀(m, k) : K (m, k) ⇒ K(m, k).
+This definition means that a protocol evaluating K to 
+decide which triples must be attached to messages, does not
+miss triples whose transmission is required by Theorem 2.
+Let us consider the constant condition (denoted K1),
+that is always false, i.e., ∀(m, k) : K1(m, k) = false. This
+trivially correct approximation of K actually corresponds
+to the particular IPT protocol described in Section 3 (in
+which each message carries a whole vector clock and a 
+whole boolean vector). The next section presents a better
+approximation of K (denoted K2).
+5.1 A Boolean Matrix-Based Evaluable 
+Condition
+Condition K2 is based on the observation that condition
+K is composed of sub-conditions. Some of them can be
+Pj
+send(m)
+Pi
+V Ci[k] = x
+IPi[k] = 1
+V Cj[k] ≥ x receive(m)
+Figure 2: The Evaluable Condition K2
+locally evaluated while the others cannot. More 
+precisely, K ≡ a ∨ α ∨ (β ∧ b), where a ≡ send(m).V Ci[k] = 0
+and b ≡ send(m).IPi[k] = 1 are locally evaluable, 
+whereas α ≡ send(m).V Ci[k] < pred(receive(m)).V Cj[k] and
+β ≡ send(m).V Ci[k] = pred(receive(m)).V Cj[k] are not.
+But, from easy boolean calculus, a∨((α∨β)∧b) =⇒ a∨α∨
+(β ∧ b) ≡ K. This leads to condition K ≡ a ∨ (γ ∧ b), where
+γ = α ∨ β ≡ send(m).V Ci[k] ≤ pred(receive(m)).V Cj[k] ,
+i.e., K ≡ (send(m).V Ci[k] ≤ pred(receive(m)).V Cj[k] ∧
+send(m).IPi[k] = 1) ∨ send(m).V Ci[k] = 0.
+So, Pi needs to approximate the predicate send(m).V Ci[k]
+≤ pred(receive(m)).V Cj[k]. To be correct, this 
+approximation has to be a locally evaluable predicate ci(j, k) such that,
+when Pi is about to send a message m to Pj, ci(j, k) ⇒
+(send(m).V Ci[k] ≤ pred(receive(m)).V Cj[k]). Informally,
+that means that, when ci(j, k) holds, the local context of
+Pi allows to deduce that the receipt of m by Pj will not
+lead to V Cj[k] update (Pj knows as much as Pi about
+Pk). Hence, the concrete condition K2 is the following:
+K2 ≡ send(m).V Ci[k] = 0 ∨ (ci(j, k) ∧ send(m).IPi[k] = 1).
+Let us now examine the design of such a predicate 
+(denoted ci). First, the case j = i can be ignored, since it is
+assumed (Section 2.1) that a process never sends a 
+message to itself. Second, in the case j = k, the relation
+send(m).V Ci[j] ≤ pred(receive(m)).V Cj [j] is always true,
+because the receipt of m by Pj cannot update V Cj[j]. Thus,
+∀j = i : ci(j, j) must be true. Now, let us consider the case
+where j = i and j = k (Figure 2). Suppose that there exists
+an event e = receive(m ) with e < send(m), m sent by
+Pj and piggybacking the triple (k, m .V C[k], m .IP[k]), and
+m .V C[k] ≥ V Ci[k] (hence m .V C[k] = receive(m ).V Ci[k]).
+As V Cj[k] cannot decrease this means that, as long as V Ci[k]
+does not increase, for every message m sent by Pi to Pj we
+have the following: send(m).V Ci[k] = receive(m ).V Ci[k] =
+send(m ).V Cj[k] ≤ receive(m).V Cj [k], i.e., ci(j, k) must 
+remain true. In other words, once ci(j, k) is true, the only
+event of Pi that could reset it to false is either the receipt
+of a message that increases V Ci[k] or, if k = i, the 
+occurrence of a relevant event (that increases V Ci[i]). Similarly,
+once ci(j, k) is false, the only event that can set it to true is
+the receipt of a message m from Pj, piggybacking the triple
+(k, m .V C[k], m .IP[k]) with m .V C[k] ≥ V Ci[k].
+In order to implement the local predicates ci(j, k), each
+process Pi is equipped with a boolean matrix Mi (as in [11])
+such that M[j, k] = 1 ⇔ ci(j, k). It follows from the 
+previous discussion that this matrix is managed according to the
+following rules (note that its i-th line is not significant (case
+j = i), and that its diagonal is always equal to 1):
+M0 Initialization: ∀ (j, k) : Mi[j, k] is initialized to 1.
+215
+M1 Each time it produces a relevant event e: Pi resets4
+the ith column of its matrix: ∀j = i : Mi[j, i] := 0.
+M2 When Pi sends a message: no update of Mi occurs.
+M3 When it receives a message m from Pj , Pi executes the
+following updates:
+∀ k ∈ [1..n] : case
+V Ci[k] < m.V C[k] then ∀ = i, j, k : Mi[ , k] := 0;
+Mi[j, k] := 1
+V Ci[k] = m.V C[k] then Mi[j, k] := 1
+V Ci[k] > m.V C[k] then skip
+endcase
+The following lemma results from rules M0-M3. The 
+theorem that follows shows that condition K2(m, k) is correct.
+(Both are proved in [1].)
+Lemma 6. ∀i, ∀m sent by Pi to Pj, ∀k, we have:
+send(m).Mi[j, k] = 1 ⇒
+send(m).V Ci[k] ≤ pred(receive(m)).V Cj [k].
+Theorem 3. Let m be a message sent by Pi to Pj . Let
+K2(m, k) ≡ ((send(m).Mi[j, k] = 1) ∧ (send(m).IPi[k] =
+1)∨(send(m).V Ci[k] = 0)). We have: K2(m, k) ⇒ K(m, k).
+5.2 Resulting IPT Protocol
+The complete text of the IPT protocol based on the 
+previous discussion follows.
+RM0 Initialization:
+- Both V Ci[1..n] and IPi[1..n] are set to [0, . . . , 0],
+and ∀ (j, k) : Mi[j, k] is set to 1.
+RM1 Each time it produces a relevant event e:
+- Pi associates with e the timestamp e.TS defined
+as follows: e.TS = {(k, V Ci[k]) | IPi[k] = 1},
+- Pi increments its vector clock entry V Ci[i] 
+(namely, it executes V Ci[i] := V Ci[i] + 1),
+- Pi resets IPi: ∀ = i : IPi[ ] := 0; IPi[i] := 1.
+- Pi resets the ith column of its boolean matrix:
+∀j = i : Mi[j, i] := 0.
+RM2 When Pi sends a message m to Pj, it attaches to m the
+set of triples (each made up of a process id, an integer
+and a boolean): {(k, V Ci[k], IPi[k]) | (Mi[j, k] = 0 ∨
+IPi[k] = 0) ∧ (V Ci[k] > 0)}.
+RM3 When Pi receives a message m from Pj , it executes the
+following updates:
+∀(k,m.V C[k], m.IP[k]) carried by m:
+case
+V Ci[k] < m.V C[k] then V Ci[k] := m.V C[k];
+IPi[k] := m.IP[k];
+∀ = i, j, k : Mi[ , k] := 0;
+4
+Actually, the value of this column remains constant after
+its first update. In fact, ∀j, Mi[j, i] can be set to 1 only upon
+the receipt of a message from Pj, carrying the value V Cj[i]
+(see R3). But, as Mj [i, i] = 1, Pj does not send V Cj[i] to
+Pi. So, it is possible to improve the protocol by executing
+this reset of the column Mi[∗, i] only when Pi produces
+its first relevant event.
+Mi[j, k] := 1
+V Ci[k] = m.V C[k] then IPi[k] := min(IPi[k], m.IP[k]);
+Mi[j, k] := 1
+V Ci[k] > m.V C[k] then skip
+endcase
+5.3 A Tradeoff
+The condition K2(m, k) shows that a triple has not to be
+transmitted when (Mi[j, k] = 1 ∧ IPi[k] = 1) ∨ (V Ci[k] >
+0). Let us first observe that the management of IPi[k]
+is governed by the application program. More precisely,
+the IPT protocol does not define which are the 
+relevant events, it has only to guarantee a correct 
+management of IPi[k]. Differently, the matrix Mi does not belong
+to the problem specification, it is an auxiliary variable of
+the IPT protocol, which manages it so as to satisfy the
+following implication when Pi sends m to Pj : (Mi[j, k] =
+1) ⇒ (pred(receive(m)).V Cj [k] ≥ send(m).V Ci[k]). The
+fact that the management of Mi is governed by the protocol
+and not by the application program leaves open the 
+possibility to design a protocol where more entries of Mi are equal
+to 1. This can make the condition K2(m, k) more often 
+satisfied5
+and can consequently allow the protocol to transmit
+less triples.
+We show here that it is possible to transmit less triples
+at the price of transmitting a few additional boolean 
+vectors. The previous IPT matrix-based protocol (Section 5.2)
+is modified in the following way. The rules RM2 and 
+RM3 are replaced with the modified rules RM2" and RM3"
+(Mi[∗, k] denotes the kth column of Mi).
+RM2" When Pi sends a message m to Pj, it attaches to m
+the following set of 4-uples (each made up of a 
+process id, an integer, a boolean and a boolean vector):
+{(k, V Ci[k], IPi[k], Mi[∗, k]) | (Mi[j, k] = 0 ∨ IPi[k] =
+0) ∧ V Ci[k] > 0}.
+RM3" When Pi receives a message m from Pj , it executes the
+following updates:
+∀(k,m.V C[k], m.IP[k], m.M[1..n, k]) carried by m:
+case
+V Ci[k] < m.V C[k] then V Ci[k] := m.V C[k];
+IPi[k] := m.IP[k];
+∀ = i : Mi[ , k] := m.M[ , k]
+V Ci[k] = m.V C[k] then IPi[k] := min(IPi[k], m.IP[k]);
+∀ =i : Mi[ , k] :=
+max(Mi[ , k], m.M[ , k])
+V Ci[k] > m.V C[k] then skip
+endcase
+Similarly to the proofs described in [1], it is possible to
+prove that the previous protocol still satisfies the 
+property proved in Lemma 6, namely, ∀i, ∀m sent by Pi to Pj,
+∀k we have (send(m).Mi[j, k] = 1) ⇒ (send(m).V Ci[k] ≤
+pred(receive(m)).V Cj[k]).
+5
+Let us consider the previously described protocol (Section
+5.2) where the value of each matrix entry Mi[j, k] is always
+equal to 0. The reader can easily verify that this setting 
+correctly implements the matrix. Moreover, K2(m, k) is then
+always false: it actually coincides with K1(k, m) (which 
+corresponds to the case where whole vectors have to be 
+transmitted with each message).
+216
+Intuitively, the fact that some columns of matrices M are
+attached to application messages allows a transitive 
+transmission of information. More precisely, the relevant history
+of Pk known by Pj is transmitted to a process Pi via a causal
+sequence of messages from Pj to Pi. In contrast, the 
+protocol described in Section 5.2 used only a direct transmission of
+this information. In fact, as explained Section 5.1, the 
+predicate c (locally implemented by the matrix M) was based on
+the existence of a message m sent by Pj to Pi, piggybacking
+the triple (k, m .V C[k], m .IP[k]), and m .V C[k] ≥ V Ci[k],
+i.e., on the existence of a direct transmission of information
+(by the message m ).
+The resulting IPT protocol (defined by the rules RM0,
+RM1, RM2" and RM3") uses the same condition K2(m, k)
+as the previous one. It shows an interesting tradeoff between
+the number of triples (k, V Ci[k], IPi[k]) whose transmission
+is saved and the number of boolean vectors that have to
+be additionally piggybacked. It is interesting to notice that
+the size of this additional information is bounded while each
+triple includes a non-bounded integer (namely a vector clock
+value).
+6. EXPERIMENTAL STUDY
+This section compares the behaviors of the previous 
+protocols. This comparison is done with a simulation study.
+IPT1 denotes the protocol presented in Section 3.3 that 
+uses the condition K1(m, k) (which is always equal to false).
+IPT2 denotes the protocol presented in Section 5.2 that uses
+the condition K2(m, k) where messages carry triples. 
+Finally, IPT3 denotes the protocol presented in Section 5.3 that
+also uses the condition K2(m, k) but where messages carry
+additional boolean vectors.
+This section does not aim to provide an in-depth 
+simulation study of the protocols, but rather presents a general
+view on the protocol behaviors. To this end, it compares
+IPT2 and IPT3 with regard to IPT1. More precisely, for
+IPT2 the aim was to evaluate the gain in terms of triples
+(k, V Ci[k], IPi[k]) not transmitted with respect to the 
+systematic transmission of whole vectors as done in IPT1. For
+IPT3, the aim was to evaluate the tradeoff between the 
+additional boolean vectors transmitted and the number of saved
+triples. The behavior of each protocol was analyzed on a set
+of programs.
+6.1 Simulation Parameters
+The simulator provides different parameters enabling to
+tune both the communication and the processes features.
+These parameters allow to set the number of processes for
+the simulated computation, to vary the rate of 
+communication (send/receive) events, and to alter the time duration
+between two consecutive relevant events. Moreover, to be
+independent of a particular topology of the underlying 
+network, a fully connected network is assumed. Internal events
+have not been considered.
+Since the presence of the triples (k, V Ci[k], IPi[k]) 
+piggybacked by a message strongly depends on the frequency at
+which relevant events are produced by a process, different
+time distributions between two consecutive relevant events
+have been implemented (e.g., normal, uniform, and Poisson
+distributions). The senders of messages are chosen 
+according to a random law. To exhibit particular configurations
+of a distributed computation a given scenario can be 
+provided to the simulator. Message transmission delays follow
+a standard normal distribution. Finally, the last parameter
+of the simulator is the number of send events that occurred
+during a simulation.
+6.2 Parameter Settings
+To compare the behavior of the three IPT protocols, we
+performed a large number of simulations using different 
+parameters setting. We set to 10 the number of processes
+participating to a distributed computation. The number of
+communication events during the simulation has been set to
+10 000. The parameter λ of the Poisson time distribution (λ
+is the average number of relevant events in a given time 
+interval) has been set so that the relevant events are generated
+at the beginning of the simulation. With the uniform time
+distribution, a relevant event is generated (in the average)
+every 10 communication events. The location parameter of
+the standard normal time distribution has been set so that
+the occurrence of relevant events is shifted around the third
+part of the simulation experiment.
+As noted previously, the simulator can be fed with a 
+given scenario. This allows to analyze the worst case scenarios
+for IPT2 and IPT3. These scenarios correspond to the case
+where the relevant events are generated at the maximal 
+frequency (i.e., each time a process sends or receives a message,
+it produces a relevant event).
+Finally, the three IPT protocols are analyzed with the
+same simulation parameters.
+6.3 Simulation Results
+The results are displayed on the Figures 3.a-3.d. These
+figures plot the gain of the protocols in terms of the number
+of triples that are not transmitted (y axis) with respect to
+the number of communication events (x axis). From these
+figures, we observe that, whatever the time distribution 
+followed by the relevant events, both IPT2 and IPT3 exhibit
+a behavior better than IPT1 (i.e., the total number of 
+piggybacked triples is lower in IPT2 and IPT3 than in IPT1),
+even in the worst case (see Figure 3.d).
+Let us consider the worst scenario. In that case, the gain
+is obtained at the very beginning of the simulation and lasts
+as long as it exists a process Pj for which ∀k : V Cj[k] = 0.
+In that case, the condition ∀k : K(m, k) is satisfied. As soon
+as ∃k : V Cj[k] = 0, both IPT2 and IPT3 behave as IPT1
+(the shape of the curve becomes flat) since the condition
+K(m, k) is no longer satisfied.
+Figure 3.a shows that during the first events of the 
+simulation, the slope of curves IPT2 and IPT3 are steep. The
+same occurs in Figure 3.d (that depicts the worst case 
+scenario). Then the slope of these curves decreases and remains
+constant until the end of the simulation. In fact, as soon as
+V Cj[k] becomes greater than 0, the condition ¬K(m, k) 
+reduces to (Mi[j, k] = 0 ∨ IPi[k] = 0).
+Figure 3.b displays an interesting feature. It considers λ =
+100. As the relevant events are taken only during the very
+beginning of the simulation, this figure exhibits a very steep
+slope as the other figures. The figure shows that, as soon as
+no more relevant events are taken, on average, 45% of the
+triples are not piggybacked by the messages. This shows
+the importance of matrix Mi. Furthermore, IPT3 benefits
+from transmitting additional boolean vectors to save triple
+transmissions. The Figures 3.a-3.c show that the average
+gain of IPT3 with respect to IPT2 is close to 10%.
+Finally, Figure 3.c underlines even more the importance
+217
+of matrix Mi. When very few relevant events are taken,
+IPT2 and IPT3 turn out to be very efficient. Indeed, this
+figure shows that, very quickly, the gain in number of triples
+that are saved is very high (actually, 92% of the triples are
+saved).
+6.4 Lessons Learned from the Simulation
+Of course, all simulation results are consistent with the
+theoretical results. IPT3 is always better than or equal to
+IPT2, and IPT2 is always better than IPT1. The simulation
+results teach us more:
+• The first lesson we have learnt concerns the matrix Mi.
+Its use is quite significant but mainly depends on the time
+distribution followed by the relevant events. On the one
+hand, when observing Figure 3.b where a large number of
+relevant events are taken in a very short time, IPT2 can save
+up to 45% of the triples. However, we could have 
+expected a more sensitive gain of IPT2 since the boolean vector
+IP tends to stabilize to [1, ..., 1] when no relevant events
+are taken. In fact, as discussed in Section 5.3, the 
+management of matrix Mi within IPT2 does not allow a transitive
+transmission of information but only a direct transmission
+of this information. This explains why some columns of Mi
+may remain equal to 0 while they could potentially be equal
+to 1. Differently, as IPT3 benefits from transmitting 
+additional boolean vectors (providing a transitive transmission
+information) it reaches a gain of 50%.
+On the other hand, when very few relevant events are 
+taken in a large period of time (see Figure 3.c), the behavior of
+IPT2 and IPT3 turns out to be very efficient since the 
+transmission of up to 92% of the triples is saved. This comes from
+the fact that very quickly the boolean vector IPi tends to
+stabilize to [1, ..., 1] and that matrix Mi contains very few
+0 since very few relevant events have been taken. Thus, a
+direct transmission of the information is sufficient to quickly
+get matrices Mi equal to [1, ..., 1], . . . , [1, ..., 1].
+• The second lesson concerns IPT3, more precisely, the
+tradeoff between the additional piggybacking of boolean 
+vectors and the number of triples whose transmission is saved.
+With n = 10, adding 10 booleans to a triple does not 
+substantially increases its size. The Figures 3.a-3.c exhibit the
+number of triples whose transmission is saved: the average
+gain (in number of triples) of IPT3 with respect to IPT2 is
+about 10%.
+7. CONCLUSION
+This paper has addressed an important causality-related
+distributed computing problem, namely, the Immediate 
+Predecessors Tracking problem. It has presented a family of
+protocols that provide each relevant event with a timestamp
+that exactly identify its immediate predecessors. The 
+family is defined by a general condition that allows application
+messages to piggyback control information whose size can
+be smaller than n (the number of processes). In that sense,
+this family defines message size-efficient IPT protocols. 
+According to the way the general condition is implemented, 
+different IPT protocols can be obtained. Three of them have
+been described and analyzed with simulation experiments.
+Interestingly, it has also been shown that the efficiency of
+the protocols (measured in terms of the size of the control
+information that is not piggybacked by an application 
+message) depends on the pattern defined by the communication
+events and the relevant events.
+Last but not least, it is interesting to note that if one is not
+interested in tracking the immediate predecessor events, the
+protocols presented in the paper can be simplified by 
+suppressing the IPi booleans vectors (but keeping the boolean
+matrices Mi). The resulting protocols, that implement a
+vector clock system, are particularly efficient as far as the
+size of the timestamp carried by each message is concerned.
+Interestingly, this efficiency is not obtained at the price of
+additional assumptions (such as fifo channels).
+8. REFERENCES
+[1] Anceaume E., H´elary J.-M. and Raynal M., Tracking
+Immediate Predecessors in Distributed Computations. Res.
+Report #1344, IRISA, Univ. Rennes (France), 2001.
+[2] Baldoni R., Prakash R., Raynal M. and Singhal M.,
+Efficient ∆-Causal Broadcasting. Journal of Computer
+Systems Science and Engineering, 13(5):263-270, 1998.
+[3] Chandy K.M. and Lamport L., Distributed Snapshots:
+Determining Global States of Distributed Systems, ACM
+Transactions on Computer Systems, 3(1):63-75, 1985.
+[4] Diehl C., Jard C. and Rampon J.-X., Reachability Analysis
+of Distributed Executions, Proc. TAPSOFT"93,
+Springer-Verlag LNCS 668, pp. 629-643, 1993.
+[5] Fidge C.J., Timestamps in Message-Passing Systems that
+Preserve Partial Ordering, Proc. 11th Australian
+Computing Conference, pp. 56-66, 1988.
+[6] Fromentin E., Jard C., Jourdan G.-V. and Raynal M.,
+On-the-fly Analysis of Distributed Computations, IPL,
+54:267-274, 1995.
+[7] Fromentin E. and Raynal M., Shared Global States in
+Distributed Computations, JCSS, 55(3):522-528, 1997.
+[8] Fromentin E., Raynal M., Garg V.K. and Tomlinson A.,
+On-the-Fly Testing of Regular Patterns in Distributed
+Computations. Proc. ICPP"94, Vol. 2:73-76, 1994.
+[9] Garg V.K., Principles of Distributed Systems, Kluwer
+Academic Press, 274 pages, 1996.
+[10] H´elary J.-M., Most´efaoui A., Netzer R.H.B. and Raynal
+M., Communication-Based Prevention of Useless
+Ckeckpoints in Distributed Computations. Distributed
+Computing, 13(1):29-43, 2000.
+[11] H´elary J.-M., Melideo G. and Raynal M., Tracking
+Causality in Distributed Systems: a Suite of Efficient
+Protocols. Proc. SIROCCO"00, Carleton University Press,
+pp. 181-195, L"Aquila (Italy), June 2000.
+[12] H´elary J.-M., Netzer R. and Raynal M., Consistency Issues
+in Distributed Checkpoints. IEEE TSE,
+25(4):274-281, 1999.
+[13] Hurfin M., Mizuno M., Raynal M. and Singhal M., Efficient
+Distributed Detection of Conjunction of Local Predicates
+in Asynch Computations. IEEE TSE, 24(8):664-677, 1998.
+[14] Lamport L., Time, Clocks and the Ordering of Events in a
+Distributed System. Comm. ACM, 21(7):558-565, 1978.
+[15] Marzullo K. and Sabel L., Efficient Detection of a Class of
+Stable Properties. Distributed Computing, 8(2):81-91, 1994.
+[16] Mattern F., Virtual Time and Global States of Distributed
+Systems. Proc. Int. Conf. Parallel and Distributed
+Algorithms, (Cosnard, Quinton, Raynal, Robert Eds),
+North-Holland, pp. 215-226, 1988.
+[17] Prakash R., Raynal M. and Singhal M., An Adaptive
+Causal Ordering Algorithm Suited to Mobile Computing
+Environment. JPDC, 41:190-204, 1997.
+[18] Raynal M. and Singhal S., Logical Time: Capturing
+Causality in Distributed Systems. IEEE Computer,
+29(2):49-57, 1996.
+[19] Singhal M. and Kshemkalyani A., An Efficient
+Implementation of Vector Clocks. IPL, 43:47-52, 1992.
+[20] Wang Y.M., Consistent Global Checkpoints That Contain
+a Given Set of Local Checkpoints. IEEE TOC,
+46(4):456-468, 1997.
+218
+0
+1000
+2000
+3000
+4000
+5000
+6000
+0 2000 4000 6000 8000 10000
+gaininnumberoftriples
+communication events number
+IPT1
+IPT2
+IPT3
+relevant events
+(a) The relevant events follow a uniform distribution
+(ratio=1/10)
+-5000
+0
+5000
+10000
+15000
+20000
+25000
+30000
+35000
+40000
+45000
+50000
+0 2000 4000 6000 8000 10000
+gaininnumberoftriples
+communication events number
+IPT1
+IPT2
+IPT3
+relevant events
+(b) The relevant events follow a Poisson distribution
+(λ = 100)
+0
+10000
+20000
+30000
+40000
+50000
+60000
+70000
+80000
+90000
+100000
+0 2000 4000 6000 8000 10000
+gaininnumberoftriples
+communication events number
+IPT1
+IPT2
+IPT3
+relevant events
+(c) The relevant events follow a normal distribution
+0
+50
+100
+150
+200
+250
+300
+350
+400
+450
+1 10 100 1000 10000
+gaininnumberoftriples
+communication events number
+IPT1
+IPT2
+IPT3
+relevant events
+(d) For each pi, pi takes a relevant event and 
+broadcast to all processes
+Figure 3: Experimental Results
+219

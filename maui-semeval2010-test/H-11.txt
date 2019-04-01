@@ -1,0 +1,1015 @@
+Laplacian Optimal Design for Image Retrieval
+Xiaofei He
+Yahoo!
+Burbank, CA 91504
+hex@yahoo-inc.com
+Wanli Min
+IBM
+Yorktown Heights, NY 10598
+wanlimin@us.ibm.com
+Deng Cai
+CS Dept., UIUC
+Urbana, IL 61801
+dengcai2@cs.uiuc.edu
+Kun Zhou
+Microsoft Research Asia
+Beijing, China
+kunzhou@microsoft.com
+ABSTRACT
+Relevance feedback is a powerful technique to enhance 
+ContentBased Image Retrieval (CBIR) performance. It solicits the
+user"s relevance judgments on the retrieved images returned
+by the CBIR systems. The user"s labeling is then used to
+learn a classifier to distinguish between relevant and 
+irrelevant images. However, the top returned images may not be
+the most informative ones. The challenge is thus to 
+determine which unlabeled images would be the most informative
+(i.e., improve the classifier the most) if they were labeled
+and used as training samples. In this paper, we propose
+a novel active learning algorithm, called Laplacian 
+Optimal Design (LOD), for relevance feedback image retrieval.
+Our algorithm is based on a regression model which 
+minimizes the least square error on the measured (or, labeled)
+images and simultaneously preserves the local geometrical
+structure of the image space. Specifically, we assume that
+if two images are sufficiently close to each other, then their
+measurements (or, labels) are close as well. By constructing
+a nearest neighbor graph, the geometrical structure of the
+image space can be described by the graph Laplacian. We
+discuss how results from the field of optimal experimental
+design may be used to guide our selection of a subset of 
+images, which gives us the most amount of information. 
+Experimental results on Corel database suggest that the proposed
+approach achieves higher precision in relevance feedback 
+image retrieval.
+Categories and Subject Descriptors
+H.3.3 [Information storage and retrieval]: Information
+search and retrieval-Relevance feedback; G.3 [Mathematics
+of Computing]: Probability and Statistics-Experimental
+design
+General Terms
+Algorithms, Performance, Theory
+1. INTRODUCTION
+In many machine learning and information retrieval tasks,
+there is no shortage of unlabeled data but labels are 
+expensive. The challenge is thus to determine which unlabeled
+samples would be the most informative (i.e., improve the
+classifier the most) if they were labeled and used as training
+samples. This problem is typically called active learning [4].
+Here the task is to minimize an overall cost, which depends
+both on the classifier accuracy and the cost of data 
+collection. Many real world applications can be casted into active
+learning framework. Particularly, we consider the problem
+of relevance feedback driven Content-Based Image Retrieval
+(CBIR) [13].
+Content-Based Image Retrieval has attracted substantial
+interests in the last decade [13]. It is motivated by the fast
+growth of digital image databases which, in turn, require
+efficient search schemes. Rather than describe an image 
+using text, in these systems an image query is described using
+one or more example images. The low level visual features
+(color, texture, shape, etc.) are automatically extracted to
+represent the images. However, the low level features may
+not accurately characterize the high level semantic concepts.
+To narrow down the semantic gap, relevance feedback is 
+introduced into CBIR [12].
+In many of the current relevance feedback driven CBIR
+systems, the user is required to provide his/her relevance
+judgments on the top images returned by the system. The
+labeled images are then used to train a classifier to separate
+images that match the query concept from those that do
+not. However, in general the top returned images may not
+be the most informative ones. In the worst case, all the
+top images labeled by the user may be positive and thus
+the standard classification techniques can not be applied
+due to the lack of negative examples. Unlike the standard
+classification problems where the labeled samples are 
+pregiven, in relevance feedback image retrieval the system can
+actively select the images to label. Thus active learning can
+be naturally introduced into image retrieval.
+Despite many existing active learning techniques, Support
+Vector Machine (SVM) active learning [14] and regression
+based active learning [1] have received the most interests.
+Based on the observation that the closer to the SVM 
+boundary an image is, the less reliable its classification is, SVM
+active learning selects those unlabeled images closest to the
+boundary to solicit user feedback so as to achieve maximal
+refinement on the hyperplane between the two classes. The
+major disadvantage of SVM active learning is that the 
+estimated boundary may not be accurate enough. Moreover, it
+may not be applied at the beginning of the retrieval when
+there is no labeled images. Some other SVM based active
+learning algorithms can be found in [7], [9].
+In statistics, the problem of selecting samples to label is
+typically referred to as experimental design. The sample
+x is referred to as experiment, and its label y is referred
+to as measurement. The study of optimal experimental 
+design (OED) [1] is concerned with the design of experiments
+that are expected to minimize variances of a parameterized
+model. The intent of optimal experimental design is 
+usually to maximize confidence in a given model, minimize 
+parameter variances for system identification, or minimize the
+model"s output variance. Classical experimental design 
+approaches include A-Optimal Design, D-Optimal Design, and
+E-Optimal Design. All of these approaches are based on a
+least squares regression model. Comparing to SVM based
+active learning algorithms, experimental design approaches
+are much more efficient in computation. However, this kind
+of approaches takes only measured (or, labeled) data into
+account in their objective function, while the unmeasured
+(or, unlabeled) data is ignored.
+Benefit from recent progresses on optimal experimental
+design and semi-supervised learning, in this paper we 
+propose a novel active learning algorithm for image retrieval,
+called Laplacian Optimal Design (LOD). Unlike 
+traditional experimental design methods whose loss functions are
+only defined on the measured points, the loss function of
+our proposed LOD algorithm is defined on both measured
+and unmeasured points. Specifically, we introduce a locality
+preserving regularizer into the standard least-square-error
+based loss function. The new loss function aims to find a
+classifier which is locally as smooth as possible. In other
+words, if two points are sufficiently close to each other in
+the input space, then they are expected to share the same
+label. Once the loss function is defined, we can select the
+most informative data points which are presented to the user
+for labeling. It would be important to note that the most
+informative images may not be the top returned images.
+The rest of the paper is organized as follows. In Section
+2, we provide a brief description of the related work. Our
+proposed Laplacian Optimal Design algorithm is introduced
+in Section 3. In Section 4, we compare our algorithm with
+the state-or-the-art algorithms and present the experimental
+results on image retrieval. Finally, we provide some 
+concluding remarks and suggestions for future work in Section 5.
+2. RELATED WORK
+Since our proposed algorithm is based on regression 
+framework. The most related work is optimal experimental design
+[1], including A-Optimal Design, D-Optimal Design, and 
+EOptimal Design. In this Section, we give a brief description
+of these approaches.
+2.1 The Active Learning Problem
+The generic problem of active learning is the following.
+Given a set of points A = {x1, x2, · · · , xm} in Rd
+, find a
+subset B = {z1, z2, · · · , zk} ⊂ A which contains the most 
+informative points. In other words, the points zi(i = 1, · · · , k)
+can improve the classifier the most if they are labeled and
+used as training points.
+2.2 Optimal Experimental Design
+We consider a linear regression model
+y = wT
+x + (1)
+where y is the observation, x is the independent variable,
+w is the weight vector and is an unknown error with zero
+mean. Different observations have errors that are 
+independent, but with equal variances σ2
+. We define f(x) = wT
+x
+to be the learner"s output given input x and the weight
+vector w. Suppose we have a set of labeled sample points
+(z1, y1), · · · , (zk, yk), where yi is the label of zi. Thus, the
+maximum likelihood estimate for the weight vector, ˆw, is
+that which minimizes the sum squared error
+Jsse(w) =
+k
+i=1
+wT
+zi − yi
+2
+(2)
+The estimate ˆw gives us an estimate of the output at a novel
+input: ˆy = ˆwT
+x.
+By Gauss-Markov theorem, we know that ˆw − w has a
+zero mean and a covariance matrix given by σ2
+H−1
+sse, where
+Hsse is the Hessian of Jsse(w)
+Hsse =
+∂2
+Jsse
+∂w2
+=
+k
+i=1
+zizT
+i = ZZT
+where Z = (z1, z2, · · · , zk).
+The three most common scalar measures of the size of the
+parameter covariance matrix in optimal experimental design
+are:
+• D-optimal design: determinant of Hsse.
+• A-optimal design: trace of Hsse.
+• E-optimal design: maximum eigenvalue of Hsse.
+Since the computation of the determinant and eigenvalues
+of a matrix is much more expensive than the computation
+of matrix trace, A-optimal design is more efficient than the
+other two. Some recent work on experimental design can be
+found in [6], [16].
+3. LAPLACIAN OPTIMAL DESIGN
+Since the covariance matrix Hsse used in traditional 
+approaches is only dependent on the measured samples, i.e.
+zi"s, these approaches fail to evaluate the expected errors
+on the unmeasured samples. In this Section, we introduce
+a novel active learning algorithm called Laplacian Optimal
+Design (LOD) which makes efficient use of both measured
+(labeled) and unmeasured (unlabeled) samples.
+3.1 The Objective Function
+In many machine learning problems, it is natural to 
+assume that if two points xi, xj are sufficiently close to each
+other, then their measurements (f(xi), f(xj)) are close as
+well. Let S be a similarity matrix. Thus, a new loss function
+which respects the geometrical structure of the data space
+can be defined as follows:
+J0(w) =
+k
+i=1
+f(zi)−yi
+2
++
+λ
+2
+m
+i,j=1
+f(xi)−f(xj)
+2
+Sij (3)
+where yi is the measurement (or, label) of zi. Note that,
+the loss function (3) is essentially the same as the one used
+in Laplacian Regularized Regression (LRR, [2]). However,
+LRR is a passive learning algorithm where the training data
+is given. In this paper, we are focused on how to select the
+most informative data for training. The loss function with
+our choice of symmetric weights Sij (Sij = Sji) incurs a
+heavy penalty if neighboring points xi and xj are mapped
+far apart. Therefore, minimizing J0(w) is an attempt to
+ensure that if xi and xj are close then f(xi) and f(xj) are
+close as well. There are many choices of the similarity matrix
+S. A simple definition is as follows:
+Sij =
+⎧
+⎨
+⎩
+1, if xi is among the p nearest neighbors of xj,
+or xj is among the p nearest neighbors of xi;
+0, otherwise.
+(4)
+Let D be a diagonal matrix, Dii = j Sij, and L = D−S.
+The matrix L is called graph Laplacian in spectral graph
+theory [3]. Let y = (y1, · · · , yk)T
+and X = (x1, · · · , xm).
+Following some simple algebraic steps, we see that:
+J0(w)
+=
+k
+i=1
+wT
+zi − yi
+2
++
+λ
+2
+m
+i,j=1
+wT
+xi − wT
+xj
+2
+Sij
+= y − ZT
+w
+T
+y − ZT
+w + λwT
+m
+i=1
+DiixixT
+i
+−
+m
+i,j=1
+SijxixT
+j w
+= yT
+y − 2wT
+Zy + wT
+ZZT
+w
++λwT
+XDXT
+− XSXT
+w
+= yT
+y − 2wT
+Zy + wT
+ZZT
++ λXLXT
+w
+The Hessian of J0(w) can be computed as follows:
+H0 =
+∂2
+J0
+∂w2
+= ZZT
++ λXLXT
+In some cases, the matrix ZZT
++λXLXT
+is singular (e.g. if
+m < d). Thus, there is no stable solution to the optimization
+problem Eq. (3). A common way to deal with this ill-posed
+problem is to introduce a Tikhonov regularizer into our loss
+function:
+J(w)
+=
+k
+i=1
+wT
+zi − yi
+2
++
+λ1
+2
+m
+i,j=1
+wT
+xi − wT
+xj
+2
+Sij
++λ2 w 2
+(5)
+The Hessian of the new loss function is given by:
+H =
+∂2
+J
+∂w2
+= ZZT
++ λ1XLXT
++ λ2I
+:= ZZT
++ Λ
+where I is an identity matrix and Λ = λ1XLXT
++ λ2I.
+Clearly, H is of full rank. Requiring that the gradient of
+J(w) with respect to w vanish gives the optimal estimate
+ˆw:
+ˆw = H−1
+Zy
+The following proposition states the bias and variance 
+properties of the estimator for the coefficient vector w.
+Proposition 3.1. E( ˆw − w) = −H−1
+Λw, Cov( ˆw) =
+σ2
+(H−1
+− H−1
+ΛH−1
+)
+Proof. Since y = ZT
+w + and E( ) = 0, it follows that
+E( ˆw − w) (6)
+= H−1
+ZZT
+w − w
+= H−1
+(ZZT
++ Λ − Λ)w − w
+= (I − H−1
+Λ)w − w
+= −H−1
+Λw (7)
+Notice Cov(y) = σ2
+I, the covariance matrix of ˆw has the
+expression:
+Cov( ˆw) = H−1
+ZCov(y)ZT
+H−1
+= σ2
+H−1
+ZZT
+H−1
+= σ2
+H−1
+(H − Λ)H−1
+= σ2
+(H−1
+− H−1
+ΛH−1
+) (8)
+Therefore mean squared error matrix for the coefficients w
+is
+E(w − ˆw)(w − ˆw)T
+(9)
+= H−1
+ΛwwT
+ΛH−1
++ σ2
+(H−1
+− H−1
+ΛH−1
+) (10)
+For any x, let ˆy = ˆwT
+x be its predicted observation. The
+expected squared prediction error is
+E(y − ˆy)2
+= E( + wT
+x − ˆwT
+x)2
+= σ2
++ xT
+[E(w − ˆw)(w − ˆw)T
+]x
+= σ2
++ xT
+[H−1
+ΛwwT
+ΛH−1
++ σ2
+H−1
+− σ2
+H−1
+ΛH−1
+]x
+Clearly the expected square prediction error depends on the
+explanatory variable x, therefore average expected square
+predictive error over the complete data set A is
+1
+m
+m
+i=1
+E(yi − ˆwT
+xi)2
+=
+1
+m
+m
+i=1
+xT
+i [H−1
+ΛwwT
+ΛH−1
++ σ2
+H−1
+− σ2
+H−1
+ΛH−1
+]xi
++σ2
+=
+1
+m
+Tr(XT
+[σ2
+H−1
++ H−1
+ΛwwT
+ΛH−1
+− σ2
+H−1
+ΛH−1
+]X)
++σ2
+Since
+Tr(XT
+[H−1
+ΛwwT
+ΛH−1
+− σ2
+H−1
+ΛH−1
+]X)
+Tr(σ2
+XT
+H−1
+X),
+Our Laplacian optimality criterion is thus formulated by
+minimizing the trace of XT
+H−1
+X.
+Definition 1. Laplacian Optimal Design
+min
+Z=(z1,··· ,zk)
+Tr XT
+ZZT
++ λ1XLXT
++ λ2I
+−1
+X (11)
+where z1, · · · , zk are selected from {x1, · · · , xm}.
+4. KERNEL LAPLACIAN OPTIMAL DESIGN
+Canonical experimental design approaches (e.g. A-Optimal
+Design, D-Optimal Design, and E-Optimal) only consider
+linear functions. They fail to discover the intrinsic geometry
+in the data when the data space is highly nonlinear. In this
+section, we describe how to perform Laplacian 
+Experimental Design in Reproducing Kernel Hilbert Space (RKHS)
+which gives rise to Kernel Laplacian Experimental Design
+(KLOD).
+For given data points x1, · · · , xm ∈ X with a positive
+definite mercer kernel K : X ×X → R, there exists a unique
+RKHS HK of real valued functions on X. Let Kt(s) be the
+function of s obtained by fixing t and letting Kt(s)
+.
+= K(s, t).
+HK consists of all finite linear combinations of the form
+l
+i=1 αiKti with ti ∈ X and limits of such functions as the
+ti become dense in X. We have Ks, Kt HK = K(s, t).
+4.1 Derivation of LOD in Reproducing
+Kernel Hilbert Space
+Consider the optimization problem (5) in RKHS. Thus,
+we seek a function f ∈ HK such that the following objective
+function is minimized:
+min
+f∈HK
+k
+i=1
+f(zi)−yi
+2
++
+λ1
+2
+m
+i,j=1
+f(xi)−f(xj)
+2
+Sij+λ2 f 2
+HK
+(12)
+We have the following proposition.
+Proposition 4.1. Let H = { m
+i=1 αiK(·, xi)|αi ∈ R} be
+a subspace of HK , the solution to the problem (12) is in H.
+Proof. Let H⊥
+be the orthogonal complement of H, i.e.
+HK = H ⊕ H⊥
+. Thus, for any function f ∈ HK , it has
+orthogonal decomposition as follows:
+f = fH + fH⊥
+Now, let"s evaluate f at xi:
+f(xi) = f, Kxi HK
+= fH + fH⊥ , Kxi HK
+= fH, Kxi HK + fH⊥ , Kxi HK
+Notice that Kxi ∈ H while fH⊥ ∈ H⊥
+. This implies that
+fH⊥ , Kxi HK = 0. Therefore,
+f(xi) = fH, Kxi HK = fH(xi)
+This completes the proof.
+Proposition 4.1 tells us the minimizer of problem (12) admits
+a representation f∗
+= m
+i=1 αiK(·, xi). Please see [2] for the
+details.
+Let φ : Rd
+→ H be a feature map from the input space
+Rd
+to H, and K(xi, xj) =< φ(xi), φ(xj) >. Let X denote
+the data matrix in RKHS, X = (φ(x1), φ(x2), · · · , φ(xm)).
+Similarly, we define Z = (φ(z1), φ(z2), · · · , φ(zk)). Thus,
+the optimization problem in RKHS can be written as follows:
+min
+Z
+Tr XT
+ZZT
++ λ1XLXT
++ λ2I
+−1
+X (13)
+Since the mapping function φ is generally unknown, there
+is no direct way to solve problem (13). In the following, we
+apply kernel tricks to solve this optimization problem. Let
+X−1
+be the Moore-Penrose inverse (also known as pseudo
+inverse) of X. Thus, we have:
+XT
+ZZT
++ λ1XLXT
++ λ2I
+−1
+X
+= XT
+XX−1
+ZZT
++ λ1XLXT
++ λ2I
+−1
+(XT
+)−1
+XT
+X
+= XT
+X ZZT
+X + λ1XLXT
+X + λ2X
+−1
+(XT
+)−1
+XT
+X
+= XT
+X XT
+ZZT
+X + λ1XT
+XLXT
+X + λ2XT
+X
+−1
+XT
+X
+= KXX KXZKZX + λ1KXXLKXX + λ2KXX
+−1
+KXX
+where KXX is a m × m matrix (KXX,ij = K(xi, xj)), KXZ
+is a m×k matrix (KXZ,ij = K(xi, zj)), and KZX is a k×m
+matrix (KZX,ij = K(zi, xj)). Thus, the Kernel Laplacian
+Optimal Design can be defined as follows:
+Definition 2. Kernel Laplacian Optimal Design
+minZ=(z1,··· ,zk) Tr KXX KXZKZX + λ1KXXLKXX
+λ2KXX
+−1
+KXX (14)
+4.2 Optimization Scheme
+In this subsection, we discuss how to solve the 
+optimization problems (11) and (14). Particularly, if we select a
+linear kernel for KLOD, then it reduces to LOD. Therefore,
+we will focus on problem (14) in the following.
+It can be shown that the optimization problem (14) is
+NP-hard. In this subsection, we develop a simple sequential
+greedy approach to solve (14). Suppose n points have been
+selected, denoted by a matrix Zn
+= (z1, · · · , zn). The (n +
+1)-th point zn+1 can be selected by solving the following
+optimization problem:
+max
+Zn+1=(Zn,zn+1)
+Tr KXX KXZn+1 KZn+1X +
+λ1KXXLKXX + λ2KXX
+−1
+KXX (15)
+The kernel matrices KXZn+1 and KZn+1X can be rewritten
+as follows:
+KXZn+1 = KXZn , KXzn+1 , KZn+1X =
+KZnX
+Kzn+1X
+Thus, we have:
+KXZn+1 KZn+1X = KXZn KZnX + KXzn+1 Kzn+1X
+We define:
+A = KXZn KZnX + λ1KXXLKXX + λ2KXX
+A is only dependent on X and Zn
+. Thus, the (n + 1)-th
+point zn+1 is given by:
+zn+1 = arg min
+zn+1
+Tr KXX A + KXzn+1 Kzn+1X
+−1
+KXX
+(16)
+Each time we select a new point zn+1, the matrix A is 
+updated by:
+A ← A + KXzn+1 Kzn+1X
+If the kernel function is chosen as inner product K(x, y) =
+x, y , then HK is a linear functional space and the 
+algorithm reduces to LOD.
+5. CONTENT-BASED IMAGE RETRIEVAL
+USING LAPLACIAN OPTIMAL DESIGN
+In this section, we describe how to apply Laplacian 
+Optimal Design to CBIR. We begin with a brief description of
+image representation using low level visual features.
+5.1 Low-Level Image Representation
+Low-level image representation is a crucial problem in
+CBIR. General visual features includes color, texture, shape,
+etc. Color and texture features are the most extensively used
+visual features in CBIR. Compared with color and texture
+features, shape features are usually described after images
+have been segmented into regions or objects. Since robust
+and accurate image segmentation is difficult to achieve, the
+use of shape features for image retrieval has been limited
+to special applications where objects or regions are readily
+available.
+In this work, We combine 64-dimensional color histogram
+and 64-dimensional Color Texture Moment (CTM, [15]) to
+represent the images. The color histogram is calculated 
+using 4 × 4 × 4 bins in HSV space. The Color Texture 
+Moment is proposed by Yu et al. [15], which integrates the
+color and texture characteristics of the image in a compact
+form. CTM adopts local Fourier transform as a texture 
+representation scheme and derives eight characteristic maps to
+describe different aspects of co-occurrence relations of 
+image pixels in each channel of the (SVcosH, SVsinH, V) color
+space. Then CTM calculates the first and second moment
+of these maps as a representation of the natural color image
+pixel distribution. Please see [15] for details.
+5.2 Relevance Feedback Image Retrieval
+Relevance feedback is one of the most important 
+techniques to narrow down the gap between low level visual
+features and high level semantic concepts [12]. 
+Traditionally, the user"s relevance feedbacks are used to update the
+query vector or adjust the weighting of different dimensions.
+This process can be viewed as an on-line learning process in
+which the image retrieval system acts as a learner and the
+user acts as a teacher. They typical retrieval process is 
+outlined as follows:
+1. The user submits a query image example to the 
+system. The system ranks the images in database 
+according to some pre-defined distance metric and presents
+to the user the top ranked images.
+2. The system selects some images from the database and
+request the user to label them as relevant or 
+irrelevant.
+3. The system uses the user"s provided information to 
+rerank the images in database and returns to the user
+the top images. Go to step 2 until the user is satisfied.
+Our Laplacian Optimal Design algorithm is applied in the
+second step for selecting the most informative images. Once
+we get the labels for the images selected by LOD, we apply
+Laplacian Regularized Regression (LRR, [2]) to solve the
+optimization problem (3) and build the classifier. The 
+classifier is then used to re-rank the images in database. Note
+that, in order to reduce the computational complexity, we
+do not use all the unlabeled images in the database but only
+those within top 500 returns of previous iteration.
+6. EXPERIMENTAL RESULTS
+In this section, we evaluate the performance of our 
+proposed algorithm on a large image database. To demonstrate
+the effectiveness of our proposed LOD algorithm, we 
+compare it with Laplacian Regularized Regression (LRR, [2]),
+Support Vector Machine (SVM), Support Vector Machine
+Active Learning (SVMactive) [14], and A-Optimal Design
+(AOD). Both SVMactive, AOD, and LOD are active 
+learning algorithms, while LRR and SVM are standard 
+classification algorithms. SVM only makes use of the labeled
+images, while LRR is a semi-supervised learning algorithm
+which makes use of both labeled and unlabeled images. For
+SVMactive, AOD, and LOD, 10 training images are selected
+by the algorithms themselves at each iteration. While for
+LRR and SVM, we use the top 10 images as training data.
+It would be important to note that SVMactive is based on
+the ordinary SVM, LOD is based on LRR, and AOD is based
+on the ordinary regression. The parameters λ1 and λ2 in our
+LOD algorithm are empirically set to be 0.001 and 0.00001.
+For both LRR and LOD algorithms, we use the same graph
+structure (see Eq. 4) and set the value of p (number of 
+nearest neighbors) to be 5. We begin with a simple synthetic
+example to give some intuition about how LOD works.
+6.1 Simple Synthetic Example
+A simple synthetic example is given in Figure 1. The data
+set contains two circles. Eight points are selected by AOD
+and LOD. As can be seen, all the points selected by AOD
+are from the big circle, while LOD selects four points from
+the big circle and four from the small circle. The numbers
+beside the selected points denote their orders to be selected.
+Clearly, the points selected by our LOD algorithm can better
+represent the original data set. We did not compare our
+algorithm with SVMactive because SVMactive can not be
+applied in this case due to the lack of the labeled points.
+6.2 Image Retrieval Experimental Design
+The image database we used consists of 7,900 images of
+79 semantic categories, from COREL data set. It is a large
+and heterogeneous image set. Each image is represented as
+a 128-dimensional vector as described in Section 5.1. Figure
+2 shows some sample images.
+To exhibit the advantages of using our algorithm, we need
+a reliable way of evaluating the retrieval performance and
+the comparisons with other algorithms. We list different
+aspects of the experimental design below.
+6.2.1 Evaluation Metrics
+We use precision-scope curve and precision rate [10] to
+evaluate the effectiveness of the image retrieval algorithms.
+The scope is specified by the number (N) of top-ranked 
+images presented to the user. The precision is the ratio of
+the number of relevant images presented to the user to the
+(a) Data set
+1
+2
+3
+4
+5
+6
+7
+8
+(b) AOD
+1
+2
+3
+4
+5
+6
+7
+8
+(c) LOD
+Figure 1: Data selection by active learning algorithms. The numbers beside the selected points denote their
+orders to be selected. Clearly, the points selected by our LOD algorithm can better represent the original
+data set. Note that, the SVMactive algorithm can not be applied in this case due to the lack of labeled points.
+(a) (b) (c)
+Figure 2: Sample images from category bead, elephant, and ship.
+scope N. The precision-scope curve describes the precision
+with various scopes and thus gives an overall performance
+evaluation of the algorithms. On the other hand, the 
+precision rate emphasizes the precision at a particular value of
+scope. In general, it is appropriate to present 20 images on
+a screen. Putting more images on a screen may affect the
+quality of the presented images. Therefore, the precision at
+top 20 (N = 20) is especially important.
+In real world image retrieval systems, the query image is
+usually not in the image database. To simulate such 
+environment, we use five-fold cross validation to evaluate the 
+algorithms. More precisely, we divide the whole image database
+into five subsets with equal size. Thus, there are 20 images
+per category in each subset. At each run of cross validation,
+one subset is selected as the query set, and the other four
+subsets are used as the database for retrieval. The 
+precisionscope curve and precision rate are computed by averaging
+the results from the five-fold cross validation.
+6.2.2 Automatic Relevance Feedback Scheme
+We designed an automatic feedback scheme to model the
+retrieval process. For each submitted query, our system 
+retrieves and ranks the images in the database. 10 images
+were selected from the database for user labeling and the
+label information is used by the system for re-ranking. Note
+that, the images which have been selected at previous 
+iterations are excluded from later selections. For each query,
+the automatic relevance feedback mechanism is performed
+for four iterations.
+It is important to note that the automatic relevance 
+feedback scheme used here is different from the ones described
+in [8], [11]. In [8], [11], the top four relevant and irrelevant
+images were selected as the feedback images. However, this
+may not be practical. In real world image retrieval systems,
+it is possible that most of the top-ranked images are relevant
+(or, irrelevant). Thus, it is difficult for the user to find both
+four relevant and irrelevant images. It is more reasonable
+for the users to provide feedback information only on the 10
+images selected by the system.
+6.3 Image Retrieval Performance
+In real world, it is not practical to require the user to
+provide many rounds of feedbacks. The retrieval 
+performance after the first two rounds of feedbacks (especially the
+first round) is more important. Figure 3 shows the average
+precision-scope curves of the different algorithms for the first
+two feedback iterations. At the beginning of retrieval, the
+Euclidean distances in the original 128-dimensional space
+are used to rank the images in database. After the user
+provides relevance feedbacks, the LRR, SVM, SVMactive,
+AOD, and LOD algorithms are then applied to re-rank the
+images. In order to reduce the time complexity of active
+learning algorithms, we didn"t select the most informative
+images from the whole database but from the top 500 
+images. For LRR and SVM, the user is required to label the
+top 10 images. For SVMactive, AOD, and LOD, the user
+is required to label 10 most informative images selected by
+these algorithms. Note that, SVMactive can only be 
+ap(a) Feedback Iteration 1 (b) Feedback Iteration 2
+Figure 3: The average precision-scope curves of different algorithms for the first two feedback iterations. The
+LOD algorithm performs the best on the entire scope. Note that, at the first round of feedback, the SVMactive
+algorithm can not be applied. It applies the ordinary SVM to build the initial classifier.
+(a) Precision at Top 10 (b) Precision at Top 20 (c) Precision at Top 30
+Figure 4: Performance evaluation of the five learning algorithms for relevance feedback image retrieval. (a)
+Precision at top 10, (b) Precision at top 20, and (c) Precision at top 30. As can be seen, our LOD algorithm
+consistently outperforms the other four algorithms.
+plied when the classifier is already built. Therefore, it can
+not be applied at the first round and we use the standard
+SVM to build the initial classifier. As can be seen, our LOD
+algorithm outperforms the other four algorithms on the 
+entire scope. Also, the LRR algorithm performs better than
+SVM. This is because that the LRR algorithm makes 
+efficient use of the unlabeled images by incorporating a locality
+preserving regularizer into the ordinary regression objective
+function. The AOD algorithm performs the worst. As the
+scope gets larger, the performance difference between these
+algorithms gets smaller.
+By iteratively adding the user"s feedbacks, the 
+corresponding precision results (at top 10, top 20, and top 30) of the
+five algorithms are respectively shown in Figure 4. As can be
+seen, our LOD algorithm performs the best in all the cases
+and the LRR algorithm performs the second best. Both of
+these two algorithms make use of the unlabeled images. This
+shows that the unlabeled images are helpful for discovering
+the intrinsic geometrical structure of the image space and
+therefore enhance the retrieval performance. In real world,
+the user may not be willing to provide too many relevance
+feedbacks. Therefore, the retrieval performance at the first
+two rounds are especially important. As can be seen, our
+LOD algorithm achieves 6.8% performance improvement for
+top 10 results, 5.2% for top 20 results, and 4.1% for top 30
+results, comparing to the second best algorithm (LRR) after
+the first two rounds of relevance feedbacks.
+6.4 Discussion
+Several experiments on Corel database have been 
+systematically performed. We would like to highlight several 
+interesting points:
+1. It is clear that the use of active learning is beneficial
+in the image retrieval domain. There is a significant
+increase in performance from using the active learning
+methods. Especially, out of the three active learning
+methods (SVMactive, AOD, LOD), our proposed LOD
+algorithm performs the best.
+2. In many real world applications like relevance 
+feedback image retrieval, there are generally two ways of
+reducing labor-intensive manual labeling task. One is
+active learning which selects the most informative 
+samples to label, and the other is semi-supervised learning
+which makes use of the unlabeled samples to enhance
+the learning performance. Both of these two 
+strategies have been studied extensively in the past [14],
+[7], [5], [8]. The work presented in this paper is 
+focused on active learning, but it also takes advantage of
+the recent progresses on semi-supervised learning [2].
+Specifically, we incorporate a locality preserving 
+regularizer into the standard regression framework and
+find the most informative samples with respect to the
+new objective function. In this way, the active learning
+and semi-supervised learning techniques are seamlessly
+unified for learning an optimal classifier.
+3. The relevance feedback technique is crucial to image
+retrieval. For all the five algorithms, the retrieval 
+performance improves with more feedbacks provided by
+the user.
+7. CONCLUSIONS AND FUTURE WORK
+This paper describes a novel active learning algorithm,
+called Laplacian Optimal Design, to enable more effective
+relevance feedback image retrieval. Our algorithm is based
+on an objective function which simultaneously minimizes the
+empirical error and preserves the local geometrical structure
+of the data space. Using techniques from experimental 
+design, our algorithm finds the most informative images to
+label. These labeled images and the unlabeled images in
+the database are used to learn a classifier. The 
+experimental results on Corel database show that both active learning
+and semi-supervised learning can significantly improve the
+retrieval performance.
+In this paper, we consider the image retrieval problem on
+a small, static, and closed-domain image data. A much more
+challenging domain is the World Wide Web (WWW). For
+Web image search, it is possible to collect a large amount
+of user click information. This information can be naturally
+used to construct the affinity graph in our algorithm. 
+However, the computational complexity in Web scenario may 
+become a crucial issue. Also, although our primary interest in
+this paper is focused on relevance feedback image retrieval,
+our results may also be of interest to researchers in patten
+recognition and machine learning, especially when a large
+amount of data is available but only a limited samples can
+be labeled.
+8. REFERENCES
+[1] A. C. Atkinson and A. N. Donev. Optimum
+Experimental Designs. Oxford University Press, 2002.
+[2] M. Belkin, P. Niyogi, and V. Sindhwani. Manifold
+regularization: A geometric framework for learning
+from examples. Journal of Machine Learning
+Research, 7:2399-2434, 2006.
+[3] F. R. K. Chung. Spectral Graph Theory, volume 92 of
+Regional Conference Series in Mathematics. AMS,
+1997.
+[4] D. A. Cohn, Z. Ghahramani, and M. I. Jordan. Active
+learning with statistical models. Journal of Artificial
+Intelligence Research, 4:129-145, 1996.
+[5] A. Dong and B. Bhanu. A new semi-supervised em
+algorithm for image retrieval. In IEEE Conf. on
+Computer Vision and Pattern Recognition, Madison,
+WI, 2003.
+[6] P. Flaherty, M. I. Jordan, and A. P. Arkin. Robust
+design of biological experiments. In Advances in
+Neural Information Processing Systems 18, Vancouver,
+Canada, 2005.
+[7] K.-S. Goh, E. Y. Chang, and W.-C. Lai. Multimodal
+concept-dependent active learning for image retrieval.
+In Proceedings of the ACM Conference on Multimedia,
+New York, October 2004.
+[8] X. He. Incremental semi-supervised subspace learning
+for image retrieval. In Proceedings of the ACM
+Conference on Multimedia, New York, October 2004.
+[9] S. C. Hoi and M. R. Lyu. A semi-supervised active
+learning framework for image retrieval. In IEEE
+International Conference on Computer Vision and
+Pattern Recognition, San Diego, CA, 2005.
+[10] D. P. Huijsmans and N. Sebe. How to complete
+performance graphs in content-based image retrieval:
+Add generality and normalize scope. IEEE
+Transactions on Pattern Analysis and Machine
+Intelligence, 27(2):245-251, 2005.
+[11] Y.-Y. Lin, T.-L. Liu, and H.-T. Chen. Semantic
+manifold learning for image retrieval. In Proceedings of
+the ACM Conference on Multimedia, Singapore,
+November 2005.
+[12] Y. Rui, T. S. Huang, M. Ortega, and S. Mehrotra.
+Relevance feedback: A power tool for interative
+content-based image retrieval. IEEE Transactions on
+Circuits and Systems for Video Technology, 8(5), 1998.
+[13] A. W. Smeulders, M. Worring, S. Santini, A. Gupta,
+and R. Jain. Content-based image retrieval at the end
+of the early years. IEEE Transactions on Pattern
+Analysis and Machine Intelligence, 22(12):1349-1380,
+2000.
+[14] S. Tong and E. Chang. Support vector machine active
+learning for image retrieval. In Proceedings of the
+ninth ACM international conference on Multimedia,
+pages 107-118, 2001.
+[15] H. Yu, M. Li, H.-J. Zhang, and J. Feng. Color texture
+moments for content-based image retrieval. In
+International Conference on Image Processing, pages
+24-28, 2002.
+[16] K. Yu, J. Bi, and V. Tresp. Active learning via
+transductive experimental design. In Proceedings of
+the 23rd
+International Conference on Machine
+Learning, Pittsburgh, PA, 2006.

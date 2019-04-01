@@ -1,0 +1,667 @@
+Resolving Conflict and Inconsistency in
+Norm-Regulated Virtual Organizations
+Wamberto Vasconcelos
+Dept. of Computing Science
+University of Aberdeen
+Aberdeen AB24 3UE
+United Kingdom
+wvasconcelos@acm.org
+Martin J. Kollingbaum
+Dept. of Computing Science
+University of Aberdeen
+Aberdeen AB24 3UE
+United Kingdom
+mkolling@csd.abdn.ac.uk
+Timothy J. Norman
+Dept. of Computing Science
+University of Aberdeen
+Aberdeen AB24 3UE
+United Kingdom
+tnorman@csd.abdn.ac.uk
+ABSTRACT
+Norm-governed virtual organizations define, govern and facilitate
+coordinated resource sharing and problem solving in societies of
+agents. With an explicit account of norms, openness in virtual 
+organizations can be achieved: new components, designed by 
+various parties, can be seamlessly accommodated. We focus on 
+virtual organizations realised as multi-agent systems, in which human
+and software agents interact to achieve individual and global goals.
+However, any realistic account of norms should address their 
+dynamic nature: norms will change as agents interact with each other
+and their environment. Due to the changing nature of norms or due
+to norms stemming from different virtual organizations, there will
+be situations when an action is simultaneously permitted and 
+prohibited, that is, a conflict arises. Likewise, there will be situations
+when an action is both obliged and prohibited, that is, an 
+inconsistency arises. We introduce an approach, based on first-order 
+unification, to detect and resolve such conflicts and inconsistencies.
+In our proposed solution, we annotate a norm with the set of 
+values their variables should not have in order to avoid a conflict or
+an inconsistency with another norm. Our approach neatly 
+accommodates the domain-dependent interrelations among actions and
+the indirect conflicts/inconsistencies these may cause. More 
+generally, we can capture a useful notion of inter-agent (and inter-role)
+delegation of actions and norms associated to them, and use it to
+address conflicts/inconsistencies caused by action delegation. We
+illustrate our approach with an e-Science example in which agents
+support Grid services.
+Categories and Subject Descriptors
+I.2.4 [Artificial Intelligence]: Applications and Expert 
+SystemsLaw; I.2.11 [Artificial Intelligence]: Distributed Artificial 
+Intelligence-Multi-agent systems
+General Terms
+Algorithms, Theory
+1. INTRODUCTION
+Virtual organizations (VOs) facilitate coordinated resource 
+sharing and problem solving involving various parties geographically
+remote [9]. VOs define and regulate interactions (thus facilitating
+coordination) among software and/or human agents that 
+communicate to achieve individual and global goals [16]. VOs are realised as
+multi-agent systems and a most desirable feature of such systems is
+openness whereby new components designed by other parties are
+seamlessly accommodated. The use of norms, that is, prohibitions,
+permissions and obligations, in the specification and operation of
+multi-agent systems (MASs) is a promising approach to achieving
+openness [2, 4, 5, 6]. Norms regulate the observable behaviour of
+self-interested, heterogeneous software agents, designed by 
+various parties who may not entirely trust each other [3, 24]. 
+However, norm-regulated VOs may experience problems when norms
+assigned to their agents are in conflict (i.e., an action is 
+simultaneously prohibited and permitted) or inconsistent (i.e., an action is
+simultaneously prohibited and obliged).
+We propose a means to automatically detect and solve conflict
+and inconsistency in norm-regulated VOs. We make use of 
+firstorder term unification [8] to find out if and how norms overlap in
+their influence (i.e., the agents and values of parameters in agents"
+actions that norms may affect). This allows for a fine-grained 
+solution whereby the influence of conflicting or inconsistent norms is
+curtailed for particular sets of values. For instance, norms agent
+x is permitted to send bid(ag1, 20) and agent ag2 is prohibited
+from doing send bid(y, z) (where x, y, z are variables and ag1,
+ag2, 20 are constants) are in conflict because their agents, actions
+and terms (within the actions) unify. We solve the conflict by 
+annotating norms with sets of values their variables cannot have, thus
+curtailing their influence. In our example, the conflict is avoided if
+we require that variable y cannot be ag1 and that z cannot be 20.
+This paper is organized as follows. In the next section we 
+provide a minimalistic definition for norm-regulated VOs. In section 3
+we formally define norm conflicts, and explain how they are 
+detected and resolved. In section 4 we describe how the machinery
+of the previous section can be adapted to detect and resolve norm
+inconsistencies. In section 5 we describe how our curtailed norms
+are used in norm-aware agent societies. In section 6 we explain
+how our machinery can be used to detect and solve indirect 
+conflicts/inconsistencies, that is, those caused via relationships among
+actions; we extend and adapt the machinery to accommodate the
+delegation of norms. In section 7 we illustrate our approach with
+an example of norm-regulated software agents serving the Grid. In
+section 8 we survey related work and in section 9 we discuss our
+contributions and give directions for future work.
+644
+978-81-904262-7-5 (RPS) c 2007 IFAAMAS
+2. VIRTUAL ORGANIZATIONS
+Virtual organizations [17] allow various parties to come together
+to share resources and engage in problem solving. This paradigm
+has found strong applications in Web-service orchestration [14],
+e-Science [16] and the Grid [9]. VOs, in their most generic 
+formulation, can be seen as coordination artifacts, allowing software and
+human agents to engage in sophisticated forms of interaction.
+We formally represent our VOs as finite-state machines in which
+the actions of individual agents label the edges between discrete
+states. This provides us with a lowest common denominator:
+there are much more sophisticated, convenient and expressive ways
+to represent interactions among agents (e.g., AUML [19] and 
+electronic institutions [20], to name a few), but for the sake of 
+generalising our approach, we shall assume any higher-level formalism
+can be mapped onto a finite-state machine (possibly with some loss
+of expressiveness). We show in Figure 1 a simple VO graphically
+represented as a finite-state machine1
+. The labels on the edges 
+con//?>=<89:;0
+p(X)
+
+q(Y,Z)
+//?>=<89:;1
+s(A,B)
+//?>=<89:;/.-,()*+2
+Figure 1: Sample VO as a Finite-State Machine
+necting the states are first-order atomic formulae, denoted 
+generically as ϕ; they stand for actions performed by individual agents.
+We define our virtual organizations as follows:
+DEF. 1. A virtual organization I is the triple S, s0, E, T where
+S = {s1, . . . , sn} is a finite and non-empty set of states, s0 ∈ S
+is the initial state, E is a finite set of edges (s, s , ϕ), s, s ∈ S
+connecting s to s with a first-order atomic formula ϕ as a label,
+and T ⊆ S is the set of terminal states.
+Notice that edges are directed, so (s, t, ϕ) = (t, s, ϕ). The sample
+VO of Figure 1 is formally represented as I = {0, 1, 2}, 0, {(0, 0,
+p(X)), (0, 1, q(Y, Z)), (1, 2, s(A, B)}, {2} . We assume an 
+implicit existential quantification on any variables in ϕ, so that, for
+instance, s(A, B) stands for ∃A, B s(A, B).
+VOs should allow for two kinds of non-determinism 
+corresponding to choices autonomous agents can make, viz., i) the one 
+arising when there is more than one edge leaving a state; and ii) the
+one arising from variables in the formulae ϕ labelling an edge, for
+which the agent carrying out the action instantiates. These kinds
+of non-determinism are desirable as they help define generic and
+flexible coordination mechanisms.
+Another important concept we use is the roles of agents in VOs.
+Roles, as exploited in, for instance, [18] and [20], help us 
+abstract from individual agents and define a pattern of behaviour to
+which any agent that adopts a role ought to conform. Moreover,
+all agents with the same role are guaranteed the same rights, duties
+and opportunities. We shall make use of two finite, non-empty sets,
+Agents = {ag1, . . . , agn} and Roles = {r1, . . . , rm}, 
+representing, respectively, the sets of agent identifiers and role labels. We
+refer generically to first-order terms, i.e., constants, variables, and
+(nested) functions as τ.
+2.1 Semantics of VOs
+The specification of a VO as a finite-state machine gives rise
+to a possibly infinite set of histories of computational behaviours,
+in which the actions labelling the paths from the initial state to a
+final state are recorded. Although the actions comprising a VO are
+carried out distributedly, we propose an explicit global account of
+all events. In practice, this can be achieved if we require individual
+1
+We adopt Prolog"s convention [1] and use strings starting with a capital letter to
+represent variables and strings starting with a small letter to represent constants.
+agents to declare/inform whatever actions they have carried out;
+this assumes trustworthy agents, naturally2
+.
+In order to record the authorship of the action, we annotate the
+formulae with the agents" unique identification. Our explicit global
+account of all events is a set of ground atomic formulae ϕ, that
+is, we only allow constants to appear as terms of formulae. Each
+formula is a truthful record of an action specified in the VO. Notice,
+however, that in the VO specification we do not restrict the syntax
+of the formulae: variables may appear in them, and when an agent
+performs an actual action then any variables of the specified action
+must be assigned values. We thus define:
+DEF. 2. A global execution state of a VO, denoted as Ξ, is a
+finite, possibly empty, set of tuples a : r, ¯ϕ, t where a ∈ Agents
+is an agent identifier, r ∈ Roles is a role label, ¯ϕ is a ground
+first-order atomic formula, and t ∈ IN is a time stamp.
+For instance, ag1:buyer, p(a, 34), 20 states that agent ag1 
+adopting role buyer performed action p(a, 34) at instant 20. Given a VO
+I = S, s0, E, T , an execution state Ξ and a state s ∈ S, we can
+define a function which obtains a possible next execution state, viz.,
+h(I, Ξ, s) = Ξ ∪ { a:r, ¯ϕ, t }, for one (s, s , ϕ) ∈ E. Such 
+function h must address the two kinds of non-determinism above, as
+well as the choice on the potential agents that can carry out the 
+action and their adopted roles. We also define a function to compute
+the set of all possible execution states, h∗
+(I, Ξ, s) = {Ξ ∪ { a:
+r, ¯ϕ, t }|(s, s , ϕ) ∈ E}.
+2.2 Norm-Regulated VOs
+We advocate a separation of concerns whereby the virtual 
+organization is complemented with an explicit and separate set of norms
+that further regulates the behaviour of agents as they take part in
+the enactment of an organization. The freedom of choice given to
+agents (captured via the non-determinism of VOs, explained above)
+must be curtailed in some circumstances. For instance, we might
+need to describe that whoever carried out ϕ is obliged to carry out
+ϕ , so that if there is a choice point in which ϕ appears as a label
+of an edge, then that edge should be followed.
+Rather than embedding such normative aspects into the agents"
+design (say, by explicitly encoding normative aspects in the agents"
+behaviour) or into the VO itself (say, by addressing exceptions and
+deviant behaviour in the mechanism itself), we adopt the view that
+a VO should be supplemented with a separate set of norms that
+further regulates the behaviour of agents as they take part in the
+enactment of the organization. This separation of concerns should
+facilitate the design of MASs; however, the different components
+(VOs and norms) must come together at some point in the design
+process. Our norms are defined as below:
+DEF. 3. A norm, generically referred to as ν, is any construct
+of the form Oτ:τ ϕ, Pτ:τ ϕ, or Fτ:τ ϕ, where τ, τ are either 
+variables or constants and ϕ is a first-order atomic formula.
+We adopt the notation of [18]: Oτ:τ ϕ represents an obligation on
+agent τ taking up role τ to bring about ϕ; we recall that τ, τ are
+variables, constants and functions applied to (nested) terms. Pτ:τ ϕ
+and Fτ:τ ϕ stand for, respectively, a permission and a prohibition
+on agent τ, playing role τ to bring about ϕ. We shall assume that
+sorts are used to properly manipulate variables for agent identifiers
+and role labels.
+We propose to formally represent the normative positions of all
+agents enacting a VO. By normative position we mean the 
+social burden associated to individuals [12], that is, their obligations,
+permissions and prohibitions:
+2
+Non-trustworthy agents can be accommodated in this proposal, if we associate to
+each of them a governor agent which supervises the actions of the external agent and
+reports on them. This approach was introduced in [12] and is explained in section 5.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 645
+DEF. 4. A global normative state Ω is a finite and possibly
+empty set of tuples ω = ν, td, ta, te where ν is a norm as above
+and td, ta, te ∈ IN are, respectively, the time when ν was 
+declared (introduced), when ν becomes active and when ν expires,
+td ≤ ta < te.
+It is worth noticing that we do not require the atomic formulae
+of norms to be ground: there could be variables in them. We
+assume an implicit universal quantification on the variables A, R
+of norms XA:Rϕ (for the deontic modalities X ∈ {O, P, F}), so
+that, for instance, PA:Rp(X, b, c) stands for ∀A ∈ Agents.∀R ∈
+Roles.∃X.PA:Rp(X, b, c). We also refer to the tuples in Ω as
+norms.
+Global normative states complement the execution states of VOs
+with information on the normative positions of individual agents.
+We can relate them via a function to obtain a norm-regulated next
+execution state of a VOs, that is, g(I, Ξ, s, Ω, t) = Ξ , t 
+standing for the time of the update. For instance, we might want all
+prohibited actions to be excluded from the next execution state,
+that is, g(I, Ξ, s, Ω, t) = Ξ ∪ { a :r, ¯ϕ, t }, (s, s , ϕ) ∈ E and
+Fa:rϕ, td, ta, te ∈ Ω, ta ≤ t ≤ te. We might equally wish that
+only permitted actions be chosen for the next execution state. We
+do not legislate, or indeed recommend, any particular way to 
+regulate VOs. We do, however, offer simple underpinnings to allow
+arbitrary policies to be put in place.
+In the same way that a normative state is useful to obtain the
+next execution state of a VO, we can use an execution state to 
+update a normative state. For instance, we might want to remove any
+obligation specific to an agent and role, which has been carried
+out by that specific agent and role, that is, f(Ξ, Ω) = Ω − Obls,
+Obls = { Oa:rϕ, td, ta, te ∈ Ω| a:r, ¯ϕ, t ∈ Ξ}.
+The management (i.e., creation and updating) of global 
+normative states is an interesting area of research. A simple but useful
+approach is reported in [11]: production rules generically depict
+how norms should be updated to reflect what agents have done and
+which norms currently hold. In this paper our focus is not to 
+propose how Ω"s should be managed; we assume some mechanism
+which does that.
+3. NORM CONFLICTS
+We now define means to detect and resolve norm conflicts and
+inconsistencies. We make use of the concept of unification [1, 8]
+of first-order terms τ, i.e., constants, variables or (nested) functions
+with terms as parameters. Initially we define substitutions:
+DEF. 5. A substitution σ is a finite and possibly empty set of
+pairs x/τ, where x is a variable and τ is a term.
+We define the application of a substitution as:
+1. c · σ = c for a constant c
+2. x · σ = τ · σ if x/τ ∈ σ; otherwise x · σ = x
+3. pn
+(τ0, . . . , τn) · σ = pn
+(τ0 · σ, . . . , τn · σ).
+4. (Xτ1:τ2 ϕ) · σ = X(τ1·σ):(τ2·σ)(ϕ · σ)
+5. ν, td, ta, te · σ = (ν · σ), td, ta, te
+Where X generically refers to any of the deontic modalities O, P, F.
+Unification between two terms τ, τ consists of finding a 
+substitution σ (also called, in this context, the unifier of τ and τ ) such
+that τ · σ = τ · σ. Many algorithms have been proposed to solve
+the unification problem, a fundamental issue in automated theorem
+proving [8], and more recent work provides very efficient ways to
+obtain unifiers. We shall make use of the following definition:
+DEF. 6. Relationship unify(τ, τ , σ) holds iff there is a 
+possibly empty σ such that τ · σ = τ · σ.
+We also define the unification of atomic formulae as unify(pn
+(τ0,
+. . . , τn), pn
+(τ0, . . . , τn), σ) which holds iff τi · σ = τi · σ, 0 ≤
+i ≤ n. The unify relationship checks if a substitution σ is indeed
+a unifier for τ, τ but it can also be used to find such σ. We assume
+that unify is a suitable implementation of a unification algorithm
+which i) always terminates (possibly failing, if a unifier cannot be
+found); ii) is correct; and iii) has a linear computational complexity.
+3.1 Conflict Detection
+A norm conflict arises when an atomic formula labelling an edge
+in the VO, i.e. an action, is simultaneously permitted and 
+prohibited [13]. In this case, both norms are in conflict with regard to
+their agents, roles and parameters (terms) of specific actions. We
+propose to use unification to detect when a prohibition and a 
+permission overlap and to employ the unifier to resolve the conflict.
+For instance, PA:Rp(c, X) and Fa:bp(Y, Z) are in conflict as they
+unify under σ = {A/a, R/b, Y/c, X/d}). If, however, the 
+variables in Fa:bp(Y, Z) do not get the values in σ then there will be
+no conflicts. We thus propose to annotate the prohibitions in Ω
+with unifiers, called here conflict sets, and use these annotations
+to determine what the variables of the prohibition cannot be in
+future unifications in order to avoid a conflict. Each prohibition
+is henceforth regarded as having such an annotation, denoted as
+(Fτ1:τ2 ϕ) Σc, td, ta, te . Initially, this annotation is empty.
+We propose to curtail the influence of prohibitions, thus giving
+agents more choices in the actions they may perform. A similar
+approach could be taken whereby permissions are curtailed, thus
+limiting the available agents" actions. Each of these policies is 
+possible: we do not legislate over any of them nor do we give 
+preference over any. In this paper we are interested in formalising such
+policies within a simple mathematical framework. A prohibition
+can be in conflict with various permissions in Ω. We, therefore,
+have to find the maximal set of conflicting pairs of permissions and
+prohibitions in Ω, by performing a pairwise inspection. This 
+requires identifying the substitution between two pairs of norms that
+characterises a conflict. This is formally captured by the following
+definition:
+DEF. 7. A conflict arises between two tuples ω, ω ∈ Ω under
+a substitution σ, denoted as cflct(ω, ω , σ), iff the following 
+conditions hold:
+1. ω = (Fτ1:τ2 ϕ) Σc, td, ta, te , ω = Pτ1:τ2
+ϕ , td, ta, te
+2. unify(τ1, τ1, σ), unify(τ2, τ2, σ), and unify(ϕ, ϕ , σ)
+3. |te − te| ≤ |ta − ta|
+That is, a prohibition and a permission conflict (condition 1) if,
+and only if, the agents and roles they apply to and their actions,
+respectively, unify under σ (condition 2) and their activation 
+periods overlap (condition 3). Substitution σ, the conflict set, 
+unifies the agents, roles and atomic formulae of a permission and a
+prohibition. The annotation Σc does not play any role when 
+detecting conflicts, but, as we show below, we have to update the
+annotation to reflect new curtailments to solve conflicts. For 
+instance, cflct( (Fa:bp(Y, d)) ∅, 1, 3, 5 , PA:Rp(c, X), 2, 3, 4 ,
+{A/a, R/b, Y/c, Z/X}) holds. We define below how we obtain
+the set of conflicting norms of a normative state Ω:
+DEF. 8. The finite, possibly empty set of conflicting norms of a
+normative state Ω, denoted as CFLS(Ω), is defined as
+CFLS(Ω) = { ω, ω , σ |ω, ω ∈ Ω, cflct(ω, ω , σ)}
+3.2 Conflict Resolution
+A fine-grained way of resolving conflict can be done via 
+unification. We detect the overlapping of the norms" influences, i.e. how
+they affect the behaviours of agents in the VO, and we curtail the
+646 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+influence of the prohibition. We illustrate with Venn diagrams in
+Figure 2 the overlap of norm influences (left) which characterises a
+conflict and the curtailment necessary to resolve the conflict (right).
+The illustration shows the space of possible values for p(X, Y ) and
+p(X, Y )
+PA:Rp(c, X)
+Fa:bp(Y, Z)
+p(X, Y )
+Fa:bp(Y, Z)
+PA:Rp(c, X)
+Figure 2: Overlap of Influence (Left) and Curtailment (Right)
+two portions of this space defining the scope of influence of norms
+PA:Rp(c, X) and Fa:bp(Y, Z). The scope of these norms overlap,
+illustrated by the intersection of boxes on the left, in actions with
+values, for instance, a, b, p(c, 2) , . . . , a, b, p(c, n) . The 
+curtailment of the prohibition eliminates the intersection: it moves the
+scope of the norm influence to outside the influence of the 
+permission. If there were multiple overlaps among one prohibition and
+various permissions, which is likely to happen, then the prohibition
+will be multiply curtailed to move the scope of the norm to avoid
+all intersections.
+The algorithm shown in Figure 3 depicts how we obtain a 
+conflictfree set of norms. It maps an existing set Ω possibly with 
+conflictalgorithm conflictResolution(Ω, Ω )
+input Ω
+output Ω
+begin
+Ω := Ω
+for each ω ∈ Ω s.t. ω = (Fa:r ¯ϕ) Σc, td, ta, te do
+if ω, ω , σ ∈ CFLS(Ω) then Ω := Ω − {ω}
+end for
+for each ω ∈ Ω s.t. ω = (Fτ1:τ2 ϕ) Σc, td, ta, te do
+ΣMAX
+c :=
+[
+ω,ω ,σc ∈CFLS(Ω )
+{σc}
+Ω := (Ω − {ω}) ∪ { (Fτ1:τ2 ϕ) (Σc ∪ ΣMAX
+c ), td, ta, te }
+end for
+end
+Figure 3: Algorithm to Resolve Conflicts in a Set of Norms
+ing norms onto a new set Ω in which the conflicts (if any) are
+resolved. The algorithm forms Ω as a set that is 
+conflict-freethis means that prohibitions are annotated with a conflict set that
+indicates which bindings for variables have to be avoided.
+Initially, Ω is set to be Ω. The algorithm operates in two stages.
+In the first stage (first for each loop), we remove all conflicting
+prohibitions ω = (Fa:r ¯ϕ) Σc, td, ta, te with ground agent/role
+pairs a : r and ground formulae ¯ϕ: the only way to resolve 
+conflicts arising from such prohibitions is to remove them altogether,
+as we cannot curtail a fully ground norm. In the second stage 
+(second for each loop), the remaining prohibitions in Ω are examined:
+the set CFLS(Ω ) contains all conflicts between permissions and
+the remaining prohibitions in Ω represented as tuples ω, ω , σc ,
+with σc representing the conflict set. As a prohibition may have
+conflicts with various permissions, the set CFLS(Ω ) may contain
+more than one tuple for each prohibition. In order to provide an Ω
+that reflects all these conflicts for a specific prohibition, we have
+to form ΣMAX
+c containing all conflict sets σc for a given 
+prohibition ω. The maximal set is used to update the annotation of the
+prohibition.
+It is important to explain the need for updating the conflict set
+of prohibitions. Normative states change as a result of agents" 
+actions [11]: existing permissions, prohibitions and obligations are
+revoked and/or new ones are put in place as a result of agents" 
+interactions with the environment and other agents. Whenever new
+norms are added we must check for new conflicts and 
+inconsistencies. If we only apply our algorithm to a pair consisting of an
+old and a new norm, then some re-processing of pairs of old norms
+(which were dealt with before) can be saved. The removal of norms
+from the set Ω is dealt with efficiently: each permission to be 
+removed must be checked first for conflicts with any existing 
+prohibition (re-processing can be avoided if we record the conflict, instead
+of detecting it again). If there is a conflict, then the conflict set will
+have been recorded in the prohibition"s annotation; this conflict set
+is thus removed from the prohibition"s annotation. The removal
+of obligations follows a similar process. Prohibitions are removed
+without the need to consider their relationships with other norms.
+Our algorithm is correct in that it provides, for a given Ω, a new
+Ω in which i) all ground prohibitions which conflict with 
+permissions have been removed; and ii) all remaining annotated 
+prohibitions (Fτ:τ ¯ϕ) Σc, td, ta, te will not unify with any of the
+permissions in Ω , provided the unifier does not appear in Σc. The
+first requirement is addressed by the first for each loop, which does
+precisely this: it removes all ground prohibitions which unify with
+an obligation. The second requirement is addressed by the second
+for each loop: each prohibition has its annotation Σc added with
+ΣMAX
+c , thus accommodating the unifiers from all permissions that
+unify with the prohibition. It is easy to see that the algorithm 
+always terminates: each of its two loops go through a finite set, 
+processing one element at a time. The set CFLS(Ω) is computed in
+a finite number of steps as are the set operations performed within
+each loop. The algorithm has, however, exponential complexity3
+,
+as the computation of CFLS(Ω) requires a pairwise comparison of
+all elements in Ω.
+We illustrate our algorithm with the following example. Let there
+be the following global normative state Ω:
+j
+(FA:Rp(X, Y )) {}, 2, 2, 9 , Pa:rp(a, b), 3, 4, 8 ,
+(Fa:rp(a, b)) {}, 2, 4, 12 Pa:rp(d, e), 3, 4, 9 ,
+ff
+The first loop removes the ground prohibition, thus obtaining the
+following Ω :
+j
+(FA:Rp(X, Y )) {}, 2, 2, 9 , Pa:bp(c, d), 3, 4, 8 ,
+Pe:f p(g, h), 3, 4, 9
+ff
+We then have the following set of conflicting norms CFLS(Ω ):
+8
+<
+:
+*
+(FA:Rp(X, Y )) {}, 2, 2, 9 ,
+Pa:bp(c, d), 3, 4, 8 ,
+{A/a, R/b, X/c, Y/d}
++
+,
+*
+(FA:Rp(X, Y )) {}, 2, 2, 9 ,
+Pe:f p(g, h), 3, 4, 9 ,
+{A/e, R/f, X/g, Y/h}
++9
+=
+;
+For each prohibition ω ∈ Ω we retrieve all elements from w, w ,
+σ ∈ CFLS(Ω ) and collect their σ"s in ΣMAX
+c . The final Ω is
+thus: 8
+<
+:
+(FA:Rp(X, Y ))
+j
+{A/a, R/b, X/c, Y/d}
+{A/e, R/f, X/g, Y/h}
+ff
+, 2, 2, 9 ,
+Pa:rp(a, b), 3, 4, 8 , Pa:rp(d, e), 3, 4, 9 ,
+9
+=
+;
+The annotated set of conflict sets should be understood as a record
+of past unifications, which informs how prohibitions should be used
+in the future in order to avoid any conflicts with permissions. We
+show in Section 5.1 how annotations are used by norm-aware agents.
+4. NORM INCONSISTENCIES
+If a substitution σ can be found that unifies an obligation and
+a prohibition, then a situation of norm inconsistency occurs [13].
+The obligation demands that an agent performs an action that is
+forbidden. We can reuse the machinery, introduced above for 
+resolving conflicts between permissions and prohibitions, in order to
+a) detect and b) resolve such inconsistencies. With Definition 7, we
+3
+The combinatorial effort is not necessary anymore if instead we maintain a set of
+norms conflict-free: each time a new norm is to be introduced then we compare it with
+the existing ones, thus making the maintenance process of linear complexity.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 647
+express the nature of a conflict between a prohibition and 
+permission. Similarly, a situation of inconsistency can be defined reusing
+this definition and replacing the P deontic modality with O. We can
+reuse the machinery for conflict resolution, developed previously,
+for resolving inconsistency. The conflict resolution algorithm can
+be applied without change to accumulate a maximal conflict set
+ΣMAX
+c for each prohibition in Ω that unifies with obligations.
+5. NORM-AWARE AGENT SOCIETIES
+We now describe how our norm-regulated VOs give rise to 
+normaware agent societies. We address open and heterogeneous MASs:
+we accommodate external agents by providing each of them with
+a corresponding governor agent [12]. This is a kind of chaperon
+that interacts with an external agent, and observes and reports on its
+behaviour. We show our architecture in Figure 4 below: a number
+External Governor
+Agents Agents Tuple Space
+ag1
+£
+¢
+ 
+¡
+gov1 ⇐⇒
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+. I, s, Ξ, Ω I, s , Ξ , Ω · · ·
+agn
+£
+¢
+ 
+¡
+govn ⇐⇒
+Figure 4: Architecture for Norm-Aware Agent Societies
+of external agents interact (denoted by the  ) with their 
+corresponding governor agents. The governor agents have access to
+the VO description I, the current state s of the VO enactment, the
+global execution state Ξ and the global normative state Ω. 
+Governor agents are able to write to and read from (denoted by the
+⇐⇒) a shared memory space (e.g., a blackboard-like solution
+implemented as a tuple space), updating the global configuration
+(denoted by the  ) to reflect the dynamics of the VO enactment.
+Governor agents are necessary because we cannot anticipate or 
+legislate over the design or behaviour of external agents. We depict 
+below how the pairs of governor/external agents work together: any
+non-deterministic choices on the VO are decided by the external
+agent; any normative aspects are considered by the governor agent.
+The governor agent represents the external agent within the VO.
+As such, it has the unique identifier of the external agent. The 
+governor agent keeps an account of all roles the external agent is 
+currently playing: in our VOs, it is possible for agents to take up more
+than one role simultaneously. We define in Figure 5 how governor
+agents work - we use a logic program for this purpose. We show
+1 main(Id, Roles) ←
+2 get tuple( I, s, Ξ, Ω )∧
+3 terminate(Id, Roles, I, Ξ, Ω)
+4 main(Id, Roles) ←
+5 get tuple( I, s, Ξ, Ω )∧
+6 filter norms(Id, Roles, Ω, ΩId )∧
+7 discuss norms(Id, Roles, I, s, Ξ, ΩId , Actions)∧
+8 update tuple(Roles, Actions, NewRoles)∧
+9 main(Id, NewRoles)
+Figure 5: Governor Agent as a Logic Program
+the lines of our clauses numbered 1-9. The first clause (lines 1-3)
+depicts the termination condition: get tuple/1 (line 2) retrieves
+I, s, Ξ, Ω from the shared tuple space and terminate/4 checks
+if the current VO enactment (recorded in Ξ) has come to an end.
+The team of governor agents synchronise their access to the tuple
+space [12], thus ensuring each has a chance to function.
+The second clause (lines 4-9) depicts a generic loop when the
+termination condition of the first clause does not hold. In this case,
+the tuple is again retrieved (line 5) and the governor agent proceeds
+(line 6) to analyse the current global normative state Ω with a view
+to obtaining the subset ΩId ⊆ Ω of norms referring to agent Id
+under roles Roles. Predicate filter norms/4 collects the norms
+which apply to agent Id (the governor agent"s external agent). In
+line 7 the governor agent, in possession of the applicable norms as
+well as other relevant information, interacts with the external agent
+to decide on a set of Actions which are norm-compliant - these
+actions will be used to update (line 8) the global execution state Ξ.
+In the process of updating the state of execution, a new set of roles
+must be assigned to the external agent, represented as NewRoles.
+The governor agent keeps looping (line 9) using the identifier for
+the external agent and its new set of roles.
+5.1 Using Annotated Norms
+We now explain how annotated norms are used by norm-aware
+agents. We do so via the definition of predicate check/2, which
+holds if its first argument, a candidate action (in the format of the
+elements of Ξ of Def. 2), is within the influence of an annotated
+prohibition ω, its second parameter. The definition, as a logic 
+program, is shown in Figure 6. It checks (line 4) if the agent identifier
+1 check(Action, ω) ←
+2 Action = a:r, ¯ϕ, t ∧
+3 ω = (Fτ1:τ2 ϕ) Σc, td, ta, te ∧
+4 unify(a, τ1, σ) ∧ unify(r, τ2, σ) ∧ unify( ¯ϕ, ϕ, σ)∧
+5 forall(σ , (σc ∈ Σc, unify(σc, σ, σ )), MGUs)∧
+6 MGUs = ∅∧
+7 ta ≤ t ≤ te
+Figure 6: Check if Action is within Influence of Curtailed Norm
+and role of the action unify with the appropriate terms τ1, τ2 of ω
+and that the actions ¯ϕ, ϕ themselves unify, all under the same 
+unifier σ. It then verifies (lines 5-6) that σ does not unify with any of
+the conflict sets in Σc. Finally, in line 7 it checks if the time of the
+action is within the norm temporal influence.
+The verification of non-unification of σ with any element of Σc
+deserves an explanation. The elements of Σc are unifiers stating
+what values the variables of the norm cannot have, that is, they
+represent gaps in the original scope of the norm"s influence. The
+test thus equates to asking if the action is outside such gaps, that is,
+the action is within the curtailed scope of influence of the norm.
+6. ACTION CONFLICT & INCONSISTENCY
+In our previous discussion, norm conflict and inconsistency were
+detected via a direct comparison of the atomic formulae 
+representing the action. However, conflicts and inconsistencies may also
+arise indirectly via relationships among actions. For instance, if
+p(X) amounts to q(X, X), then norms PA:Rp(X) and FA:Rq(X,
+X) are in conflict since PA:Rp(X) can be rewritten as PA:Rq(X,
+X) and we thus have both PA:Rq(X, X) and FA:Rq(X, X). In
+the discussion below we concentrate on norm conflict, but norm
+inconsistency can be dealt with similarly, if we change the deontic
+modalities P for O.
+Relationships among actions are domain-dependent. Different
+domains have distinct ways of relating their actions; engineers build
+ontologies to represent such relationships. We propose a simple
+means to account for such relationships and show how these can
+be connected to the mechanisms introduced above. Rather than
+making use of sophisticated formalisms for ontology construction,
+we employ a set of domain axioms, defined below:
+DEF. 9. The domain axioms, denoted as Δ, are a finite and 
+possibly empty set of formulae ϕ → (ϕ1 ∧ · · · ∧ ϕn) where ϕ, ϕi, 1 ≤
+i ≤ n, are atomic first-order formulae.
+Our example above can be captured by Δ = {(p(X) → q(X, X)),
+(q(X, X) → p(X))}. By explicitly representing and manipulating
+domain knowledge we achieve generality: the very same 
+machinery can be used with different domains. A set of norms can have
+different conflicts and inconsistencies, for distinct domains of 
+application.
+648 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 649
+650 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 651

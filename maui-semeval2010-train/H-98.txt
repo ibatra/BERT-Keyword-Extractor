@@ -1,0 +1,941 @@
+Using Asymmetric Distributions
+to Improve Text Classifier Probability Estimates
+Paul N. Bennett
+Computer Science Dept.
+Carnegie Mellon University
+Pittsburgh, PA 15213
+pbennett+@cs.cmu.edu
+ABSTRACT
+Text classifiers that give probability estimates are more readily 
+applicable in a variety of scenarios. For example, rather than 
+choosing one set decision threshold, they can be used in a Bayesian
+risk model to issue a run-time decision which minimizes a 
+userspecified cost function dynamically chosen at prediction time. 
+However, the quality of the probability estimates is crucial. We review a
+variety of standard approaches to converting scores (and poor 
+probability estimates) from text classifiers to high quality estimates and
+introduce new models motivated by the intuition that the empirical
+score distribution for the extremely irrelevant, hard to 
+discriminate, and obviously relevant items are often significantly 
+different. Finally, we analyze the experimental performance of these
+models over the outputs of two text classifiers. The analysis 
+demonstrates that one of these models is theoretically attractive 
+(introducing few new parameters while increasing flexibility), 
+computationally efficient, and empirically preferable.
+Categories and Subject Descriptors
+H.3.3 [Information Storage and Retrieval]: Information Search
+and Retrieval; I.2.6 [Artificial Intelligence]: Learning; I.5.2 
+[Pattern Recognition]: Design Methodology
+General Terms
+Algorithms, Experimentation, Reliability.
+1. INTRODUCTION
+Text classifiers that give probability estimates are more flexible
+in practice than those that give only a simple classification or even a
+ranking. For example, rather than choosing one set decision 
+threshold, they can be used in a Bayesian risk model [8] to issue a 
+runtime decision which minimizes the expected cost of a user-specified
+cost function dynamically chosen at prediction time. This can be
+used to minimize a linear utility cost function for filtering tasks
+where pre-specified costs of relevant/irrelevant are not available
+during training but are specified at prediction time. Furthermore,
+the costs can be changed without retraining the model. 
+Additionally, probability estimates are often used as the basis of deciding
+which document"s label to request next during active learning [17,
+23]. Effective active learning can be key in many information 
+retrieval tasks where obtaining labeled data can be costly - severely
+reducing the amount of labeled data needed to reach the same 
+performance as when new labels are requested randomly [17]. Finally,
+they are also amenable to making other types of cost-sensitive 
+decisions [26] and for combining decisions [3]. However, in all of
+these tasks, the quality of the probability estimates is crucial.
+Parametric models generally use assumptions that the data 
+conform to the model to trade-off flexibility with the ability to estimate
+the model parameters accurately with little training data. Since
+many text classification tasks often have very little training data, we
+focus on parametric methods. However, most of the existing 
+parametric methods that have been applied to this task have an 
+assumption we find undesirable. While some of these methods allow the
+distributions of the documents relevant and irrelevant to the topic
+to have different variances, they typically enforce the unnecessary
+constraint that the documents are symmetrically distributed around
+their respective modes. We introduce several asymmetric 
+parametric models that allow us to relax this assumption without 
+significantly increasing the number of parameters and demonstrate how
+we can efficiently fit the models. Additionally, these models can be
+interpreted as assuming the scores produced by the text classifier
+have three basic types of empirical behavior - one corresponding
+to each of the extremely irrelevant, hard to discriminate, and
+obviously relevant items.
+We first review related work on improving probability estimates
+and score modeling in information retrieval. Then, we discuss in
+further detail the need for asymmetric models. After this, we 
+describe two specific asymmetric models and, using two standard text
+classifiers, na¨ıve Bayes and SVMs, demonstrate how they can be
+efficiently used to recalibrate poor probability estimates or produce
+high quality probability estimates from raw scores. We then review
+experiments using previously proposed methods and the 
+asymmetric methods over several text classification corpora to demonstrate
+the strengths and weaknesses of the various methods. Finally, we
+summarize our contributions and discuss future directions.
+2. RELATED WORK
+Parametric models have been employed to obtain probability 
+estimates in several areas of information retrieval. Lewis & Gale [17]
+use logistic regression to recalibrate na¨ıve Bayes though the quality
+of the probability estimates are not directly evaluated; it is simply
+performed as an intermediate step in active learning. Manmatha
+et. al [20] introduced models appropriate to produce probability
+estimates from relevance scores returned from search engines and
+demonstrated how the resulting probability estimates could be 
+subsequently employed to combine the outputs of several search 
+engines. They use a different parametric distribution for the relevant
+and irrelevant classes, but do not pursue two-sided asymmetric 
+distributions for a single class as described here. They also survey the
+long history of modeling the relevance scores of search engines.
+Our work is similar in flavor to these previous attempts to model
+search engine scores, but we target text classifier outputs which we
+have found demonstrate a different type of score distribution 
+behavior because of the role of training data.
+Focus on improving probability estimates has been growing lately.
+Zadrozny & Elkan [26] provide a corrective measure for decision
+trees (termed curtailment) and a non-parametric method for 
+recalibrating na¨ıve Bayes. In more recent work [27], they investigate
+using a semi-parametric method that uses a monotonic 
+piecewiseconstant fit to the data and apply the method to na¨ıve Bayes and a
+linear SVM. While they compared their methods to other 
+parametric methods based on symmetry, they fail to provide significance
+test results. Our work provides asymmetric parametric methods
+which complement the non-parametric and semi-parametric 
+methods they propose when data scarcity is an issue. In addition, their
+methods reduce the resolution of the scores output by the classifier
+(the number of distinct values output), but the methods here do not
+have such a weakness since they are continuous functions.
+There is a variety of other work that this paper extends. Platt
+[22] uses a logistic regression framework that models noisy class
+labels to produce probabilities from the raw output of an SVM.
+His work showed that this post-processing method not only can
+produce probability estimates of similar quality to SVMs directly
+trained to produce probabilities (regularized likelihood kernel 
+methods), but it also tends to produce sparser kernels (which generalize
+better). Finally, Bennett [1] obtained moderate gains by applying
+Platt"s method to the recalibration of na¨ıve Bayes but found there
+were more problematic areas than when it was applied to SVMs.
+Recalibrating poorly calibrated classifiers is not a new problem.
+Lindley et. al [19] first proposed the idea of recalibrating classifiers,
+and DeGroot & Fienberg [5, 6] gave the now accepted standard
+formalization for the problem of assessing calibration initiated by
+others [4, 24].
+3. PROBLEM DEFINITION & APPROACH
+Our work differs from earlier approaches primarily in three points:
+(1) We provide asymmetric parametric models suitable for use when
+little training data is available; (2) We explicitly analyze the quality
+of probability estimates these and competing methods produce and
+provide significance tests for these results; (3) We target text 
+classifier outputs where a majority of the previous literature targeted the
+output of search engines.
+3.1 Problem Definition
+The general problem we are concerned with is highlighted in
+Figure 1. A text classifier produces a prediction about a document
+and gives a score s(d) indicating the strength of its decision that
+the document belongs to the positive class (relevant to the topic).
+We assume throughout there are only two classes: the positive and
+the negative (or irrelevant) class ("+" and "-" respectively).
+There are two general types of parametric approaches. The first
+of these tries to fit the posterior function directly, i.e. there is one
+p(s|+) p(s|−)
+Bayes" RuleP(+) P(−)
+Classifier
+P(+| s(d))
+Predict class, c(d)={+,−}
+confidence s(d) that c(d)=+
+Document, d
+and give unnormalized
+Figure 1: We are concerned with how to perform the box 
+highlighted in grey. The internals are for one type of approach.
+function estimator that performs a direct mapping of the score s to
+the probability P(+|s(d)). The second type of approach breaks the
+problem down as shown in the grey box of Figure 1. An estimator
+for each of the class-conditional densities (i.e. p(s|+) and p(s|−))
+is produced, then Bayes" rule and the class priors are used to obtain
+the estimate for P(+|s(d)).
+3.2 Motivation for Asymmetric Distributions
+Most of the previous parametric approaches to this problem 
+either directly or indirectly (when fitting only the posterior) 
+correspond to fitting Gaussians to the class-conditional densities; they
+differ only in the criterion used to estimate the parameters. We can
+visualize this as depicted in Figure 2. Since increasing s usually 
+indicates increased likelihood of belonging to the positive class, then
+the rightmost distribution usually corresponds to p(s|+).
+A B
+C
+0
+0.2
+0.4
+0.6
+0.8
+1
+−10 −5 0 5 10
+p(s|Class={+,−})
+Unnormalized Confidence Score s
+p(s | Class = +)
+p(s | Class = −)
+Figure 2: Typical View of Discrimination based on Gaussians
+However, using standard Gaussians fails to capitalize on a basic
+characteristic commonly seen. Namely, if we have a raw output
+score that can be used for discrimination, then the empirical 
+behavior between the modes (label B in Figure 2) is often very different
+than that outside of the modes (labels A and C in Figure 2). 
+Intuitively, the area between the modes corresponds to the hard 
+examples, which are difficult for this classifier to distinguish, while the
+areas outside the modes are the extreme examples that are usually
+easily distinguished. This suggests that we may want to uncouple
+the scale of the outside and inside segments of the distribution (as
+depicted by the curve denoted as A-Gaussian in Figure 3). As a 
+result, an asymmetric distribution may be a more appropriate choice
+for application to the raw output score of a classifier.
+Ideally (i.e. perfect classification) there will exist scores θ− and
+θ+ such that all examples with score greater than θ+ are relevant
+and all examples with scores less than θ− are irrelevant. 
+Furthermore, no examples fall between θ− and θ+. The distance
+| θ− − θ+ | corresponds to the margin in some classifiers, and
+an attempt is often made to maximize this quantity. Because text
+classifiers have training data to use to separate the classes, the 
+final behavior of the score distributions is primarily a factor of the
+amount of training data and the consequent separation in the classes
+achieved. This is in contrast to search engine retrieval where the
+distribution of scores is more a factor of language distribution across
+documents, the similarity function, and the length and type of query.
+Perfect classification corresponds to using two very asymmetric
+distributions, but in this case, the probabilities are actually one and
+zero and many methods will work for typical purposes. Practically,
+some examples will fall between θ− and θ+, and it is often 
+important to estimate the probabilities of these examples well (since they
+correspond to the hard examples). Justifications can be given for
+both why you may find more and less examples between θ− and θ+
+than outside of them, but there are few empirical reasons to believe
+that the distributions should be symmetric.
+A natural first candidate for an asymmetric distribution is to 
+generalize a common symmetric distribution, e.g. the Laplace or the
+Gaussian. An asymmetric Laplace distribution can be achieved by
+placing two exponentials around the mode in the following manner:
+p(x | θ, β, γ) =
+
+
+
+βγ
+β+γ
+exp [−β (θ − x)] x ≤ θ
+(β, γ > 0)
+βγ
+β+γ
+exp [−γ (x − θ)] x > θ
+(1)
+where θ, β, and γ are the model parameters. θ is the mode of the
+distribution, β is the inverse scale of the exponential to the left of
+the mode, and γ is the inverse scale of the exponential to the right.
+We will use the notation Λ(X | θ, β, γ) to refer to this distribution.
+0
+0.002
+0.004
+0.006
+0.008
+0.01
+-300 -200 -100 0 100 200
+p(s|Class={+,-})
+Unnormalized Confidence Score s
+Gaussian
+A-Gaussian
+Figure 3: Gaussians vs. Asymmetric Gaussians. A 
+Shortcoming of Symmetric Distributions - The vertical lines show the
+modes as estimated nonparametrically.
+We can create an asymmetric Gaussian in the same manner:
+p(x | θ, σl, σr) =
+
+
+
+2√
+2π(σl+σr)
+exp −(x−θ)2
+2σ2
+l
+x ≤ θ
+(σl, σr > 0)
+2√
+2π(σl+σr)
+exp −(x−θ)2
+2σ2
+r
+x > θ
+(2)
+where θ, σl, and σr are the model parameters. To refer to this
+asymmetric Gaussian, we use the notation Γ(X | θ, σl, σr). While
+these distributions are composed of halves, the resulting function
+is a single continuous distribution.
+These distributions allow us to fit our data with much greater
+flexibility at the cost of only fitting six parameters. We could 
+instead try mixture models for each component or other extensions,
+but most other extensions require at least as many parameters (and
+can often be more computationally expensive). In addition, the
+motivation above should provide significant cause to believe the
+underlying distributions actually behave in this way. Furthermore,
+this family of distributions can still fit a symmetric distribution,
+and finally, in the empirical evaluation, evidence is presented that
+demonstrates this asymmetric behavior (see Figure 4).
+To our knowledge, neither family of distributions has been 
+previously used in machine learning or information retrieval. Both are
+termed generalizations of an Asymmetric Laplace in [14], but we
+refer to them as described above to reflect the nature of how we
+derived them for this task.
+3.3 Estimating the Parameters of the 
+Asymmetric Distributions
+This section develops the method for finding maximum 
+likelihood estimates (MLE) of the parameters for the above asymmetric
+distributions. In order to find the MLEs, we have two choices: (1)
+use numerical estimation to estimate all three parameters at once
+(2) fix the value of θ, and estimate the other two (β and γ or σl
+and σr) given our choice of θ, then consider alternate values of θ.
+Because of the simplicity of analysis in the latter alternative, we
+choose this method.
+3.3.1 Asymmetric Laplace MLEs
+For D = {x1, x2, . . . , xN } where the xi are i.i.d. and X ∼
+Λ(X | θ, β, γ), the likelihood is N
+i Λ(X | θ, β, γ). Now, we fix
+θ and compute the maximum likelihood for that choice of θ. Then,
+we can simply consider all choices of θ and choose the one with
+the maximum likelihood over all choices of θ.
+The complete derivation is omitted because of space but is 
+available in [2]. We define the following values:
+Nl = | {x ∈ D | x ≤ θ} | Nr = | {x ∈ D | x > θ} |
+Sl =
+x∈D|x≤θ
+x Sr =
+x∈D|x>θ
+x
+Dl = Nlθ − Sl Dr = Sr − Nrθ.
+Note that Dl and Dr are the sum of the absolute differences 
+between the x belonging to the left and right halves of the distribution
+(respectively) and θ. Finally the MLEs for β and γ for a fixed θ are:
+βMLE =
+N
+Dl +
+√
+DrDl
+γMLE =
+N
+Dr +
+√
+DrDl
+. (3)
+These estimates are not wholly unexpected since we would obtain
+Nl
+Dl
+if we were to estimate β independently of γ. The elegance of
+the formulae is that the estimates will tend to be symmetric only
+insofar as the data dictate it (i.e. the closer Dl and Dr are to being
+equal, the closer the resulting inverse scales).
+By continuity arguments, when N = 0, we assign β = γ = 0
+where 0 is a small constant that acts to disperse the distribution to
+a uniform. Similarly, when N = 0 and Dl = 0, we assign β = inf
+where inf is a very large constant that corresponds to an extremely
+sharp distribution (i.e. almost all mass at θ for that half). Dr = 0
+is handled similarly.
+Assuming that θ falls in some range [φ, ψ] dependent upon only
+the observed documents, then this alternative is also easily 
+computable. Given Nl, Sl, Nr, Sr, we can compute the posterior and
+the MLEs in constant time. In addition, if the scores are sorted,
+then we can perform the whole process quite efficiently. Starting
+with the minimum θ = φ we would like to try, we loop through the
+scores once and set Nl, Sl, Nr, Sr appropriately. Then we increase
+θ and just step past the scores that have shifted from the right side
+of the distribution to the left. Assuming the number of candidate
+θs are O(n), this process is O(n), and the overall process is 
+dominated by sorting the scores, O(n log n) (or expected linear time).
+3.3.2 Asymmetric Gaussian MLEs
+For D = {x1, x2, . . . , xN } where the xi are i.i.d. and X ∼
+Γ(X | θ, σl, σr), the likelihood is N
+i Γ(X | θ, β, γ). The MLEs
+can be worked out similar to the above.
+We assume the same definitions as above (the complete 
+derivation omitted for space is available in [2]), and in addition, let:
+Sl2 =
+x∈D|x≤θ
+x2
+Sr2 =
+x∈D|x>θ
+x2
+Dl2 = Sl2 − Slθ + θ2
+Nl Dr2 = Sr2 − Srθ + θ2
+Nr.
+The analytical solution for the MLEs for a fixed θ is:
+σl,MLE =
+Dl2 + D
+2/3
+l2 D
+1/3
+r2
+N
+(4)
+σr,MLE =
+Dr2 + D
+2/3
+r2 D
+1/3
+l2
+N
+. (5)
+By continuity arguments, when N = 0, we assign σr = σl =
+inf , and when N = 0 and Dl2 = 0 (resp. Dr2 = 0), we 
+assign σl = 0 (resp. σr = 0). Again, the same computational
+complexity analysis applies to estimating these parameters.
+4. EXPERIMENTAL ANALYSIS
+4.1 Methods
+For each of the methods that use a class prior, we use a smoothed
+add-one estimate, i.e. P(c) = |c|+1
+N+2
+where N is the number of 
+documents. For methods that fit the class-conditional densities, p(s|+)
+and p(s|−), the resulting densities are inverted using Bayes" rule as
+described above. All of the methods below are fit using maximum
+likelihood estimates.
+For recalibrating a classifier (i.e. correcting poor probability 
+estimates output by the classifier), it is usual to use the log-odds of
+the classifier"s estimate as s(d). The log-odds are defined to be
+log P (+|d)
+P (−|d)
+. The normal decision threshold (minimizing error) in
+terms of log-odds is at zero (i.e. P(+|d) = P(−|d) = 0.5).
+Since it scales the outputs to a space [−∞, ∞], the log-odds
+make normal (and similar distributions) applicable [19]. Lewis &
+Gale [17] give a more motivating viewpoint that fitting the log-odds
+is a dampening effect for the inaccurate independence assumption
+and a bias correction for inaccurate estimates of the priors. In 
+general, fitting the log-odds can serve to boost or dampen the signal
+from the original classifier as the data dictate.
+Gaussians
+A Gaussian is fit to each of the class-conditional densities, using
+the usual maximum likelihood estimates. This method is denoted
+in the tables below as Gauss.
+Asymmetric Gaussians
+An asymmetric Gaussian is fit to each of the class-conditional
+densities using the maximum likelihood estimation procedure 
+described above. Intervals between adjacent scores are divided by 10
+in testing candidate θs, i.e. 8 points between actual scores 
+occurring in the data set are tested. This method is denoted as A. Gauss.
+Laplace Distributions
+Even though Laplace distributions are not typically applied to
+this task, we also tried this method to isolate why benefit is gained
+from the asymmetric form. The usual MLEs were used for 
+estimating the location and scale of a classical symmetric Laplace 
+distribution as described in [14]. We denote this method as Laplace below.
+Asymmetric Laplace Distributions
+An asymmetric Laplace is fit to each of the class-conditional
+densities using the maximum likelihood estimation procedure 
+described above. As with the asymmetric Gaussian, intervals between
+adjacent scores are divided by 10 in testing candidate θs. This
+method is denoted as A. Laplace below.
+Logistic Regression
+This method is the first of two methods we evaluated that 
+directly fit the posterior, P(+|s(d)). Both methods restrict the set
+of families to a two-parameter sigmoid family; they differ 
+primarily in their model of class labels. As opposed to the above 
+methods, one can argue that an additional boon of these methods is they
+completely preserve the ranking given by the classifier. When this
+is desired, these methods may be more appropriate. The previous
+methods will mostly preserve the rankings, but they can deviate if
+the data dictate it. Thus, they may model the data behavior better at
+the cost of departing from a monotonicity constraint in the output
+of the classifier.
+Lewis & Gale [17] use logistic regression to recalibrate na¨ıve
+Bayes for subsequent use in active learning. The model they use is:
+P(+|s(d)) =
+exp(a + b s(d))
+1 + exp(a + b s(d))
+. (6)
+Instead of using the probabilities directly output by the classifier,
+they use the loglikelihood ratio of the probabilities, log P (d|+)
+P (d|−)
+, as
+the score s(d). Instead of using this below, we will use the 
+logodds ratio. This does not affect the model as it simply shifts all of
+the scores by a constant determined by the priors. We refer to this
+method as LogReg below.
+Logistic Regression with Noisy Class Labels
+Platt [22] proposes a framework that extends the logistic 
+regression model above to incorporate noisy class labels and uses it to
+produce probability estimates from the raw output of an SVM.
+This model differs from the LogReg model only in how the 
+parameters are estimated. The parameters are still fit using maximum
+likelihood estimation, but a model of noisy class labels is used in
+addition to allow for the possibility that the class was mislabeled.
+The noise is modeled by assuming there is a finite probability of
+mislabeling a positive example and of mislabeling a negative 
+example; these two noise estimates are determined by the number
+of positive examples and the number of negative examples (using
+Bayes" rule to infer the probability of incorrect label).
+Even though the performance of this model would not be 
+expected to deviate much from LogReg, we evaluate it for 
+completeness. We refer to this method below as LR+Noise.
+4.2 Data
+We examined several corpora, including the MSN Web Directory,
+Reuters, and TREC-AP.
+MSN Web Directory
+The MSN Web Directory is a large collection of heterogeneous
+web pages (from a May 1999 web snapshot) that have been 
+hierarchically classified. We used the same train/test split of 50078/10024
+documents as that reported in [9]. The MSN Web hierarchy is a
+seven-level hierarchy; we used all 13 of the top-level categories.
+The class proportions in the training set vary from 1.15% to 22.29%.
+In the testing set, they range from 1.14% to 21.54%. The classes
+are general subjects such as Health & Fitness and Travel & Vacation.
+Human indexers assigned the documents to zero or more categories.
+For the experiments below, we used only the top 1000 words with
+highest mutual information for each class; approximately 195K
+words appear in at least three training documents.
+Reuters
+The Reuters 21578 corpus [16] contains Reuters news articles
+from 1987. For this data set, we used the ModApte standard train/
+test split of 9603/3299 documents (8676 unused documents). The
+classes are economic subjects (e.g., acq for acquisitions, earn
+for earnings, etc.) that human taggers applied to the document;
+a document may have multiple subjects. There are actually 135
+classes in this domain (only 90 of which occur in the training and
+testing set); however, we only examined the ten most frequent classes
+since small numbers of testing examples make interpreting some
+performance measures difficult due to high variance.1
+Limiting to
+the ten largest classes allows us to compare our results to 
+previously published results [10, 13, 21, 22]. The class proportions in
+the training set vary from 1.88% to 29.96%. In the testing set, they
+range from 1.7% to 32.95%.
+For the experiments below we used only the top 300 words with
+highest mutual information for each class; approximately 15K words
+appear in at least three training documents.
+TREC-AP
+The TREC-AP corpus is a collection of AP news stories from
+1988 to 1990. We used the same train/test split of 142791/66992
+documents that was used in [18]. As described in [17] (see also
+[15]), the categories are defined by keywords in a keyword field.
+The title and body fields are used in the experiments below. There
+are twenty categories in total. The class proportions in the training
+set vary from 0.06% to 2.03%. In the testing set, they range from
+0.03% to 4.32%.
+For the experiments described below, we use only the top 1000
+words with the highest mutual information for each class; 
+approximately 123K words appear in at least 3 training documents.
+4.3 Classifiers
+We selected two classifiers for evaluation. A linear SVM 
+classifier which is a discriminative classifier that does not normally 
+output probability values, and a na¨ıve Bayes classifier whose 
+probability outputs are often poor [1, 7] but can be improved [1, 26, 27].
+1
+A separate comparison of only LogReg, LR+Noise, and
+A. Laplace over all 90 categories of Reuters was also conducted.
+After accounting for the variance, that evaluation also supported
+the claims made here.
+SVM
+For linear SVMs, we use the Smox toolkit which is based on
+Platt"s Sequential Minimal Optimization algorithm. The features
+were represented as continuous values. We used the raw output
+score of the SVM as s(d) since it has been shown to be appropriate
+before [22]. The normal decision threshold (assuming we are 
+seeking to minimize errors) for this classifier is at zero.
+Na¨ıve Bayes
+The na¨ıve Bayes classifier model is a multinomial model [21].
+We smoothed word and class probabilities using a Bayesian 
+estimate (with the word prior) and a Laplace m-estimate, respectively.
+We use the log-odds estimated by the classifier as s(d). The normal
+decision threshold is at zero.
+4.4 Performance Measures
+We use log-loss [12] and squared error [4, 6] to evaluate the 
+quality of the probability estimates. For a document d with class c(d) ∈
+{+, −} (i.e. the data have known labels and not probabilities), 
+logloss is defined as δ(c(d), +) log P(+|d) + δ(c(d), −) log P(−|d)
+where δ(a, b)
+.
+= 1 if a = b and 0 otherwise. The squared error is
+δ(c(d), +)(1 − P(+|d))2
++ δ(c(d), −)(1 − P(−|d))2
+. When the
+class of a document is correctly predicted with a probability of one,
+log-loss is zero and squared error is zero. When the class of a 
+document is incorrectly predicted with a probability of one, log-loss
+is −∞ and squared error is one. Thus, both measures assess how
+close an estimate comes to correctly predicting the item"s class but
+vary in how harshly incorrect predictions are penalized.
+We report only the sum of these measures and omit the averages
+for space. Their averages, average log-loss and mean squared 
+error (MSE), can be computed from these totals by dividing by the
+number of binary decisions in a corpus.
+In addition, we also compare the error of the classifiers at their
+default thresholds and with the probabilities. This evaluates how
+the probability estimates have improved with respect to the 
+decision threshold P(+|d) = 0.5. Thus, error only indicates how the
+methods would perform if a false positive was penalized the same
+as a false negative and not the general quality of the probability
+estimates. It is presented simply to provide the reader with a more
+complete understanding of the empirical tendencies of the methods.
+We use a a standard paired micro sign test [25] to determine 
+statistical significance in the difference of all measures. Only pairs
+that the methods disagree on are used in the sign test. This test
+compares pairs of scores from two systems with the null 
+hypothesis that the number of items they disagree on are binomially 
+distributed. We use a significance level of p = 0.01.
+4.5 Experimental Methodology
+As the categories under consideration in the experiments are not
+mutually exclusive, the classification was done by training n binary
+classifiers, where n is the number of classes.
+In order to generate the scores that each method uses to fit its
+probability estimates, we use five-fold cross-validation on the 
+training data. We note that even though it is computationally efficient
+to perform leave-one-out cross-validation for the na¨ıve Bayes 
+classifier, this may not be desirable since the distribution of scores can
+be skewed as a result. Of course, as with any application of n-fold
+cross-validation, it is also possible to bias the results by holding n
+too low and underestimating the performance of the final classifier.
+4.6 Results & Discussion
+The results for recalibrating na¨ıve Bayes are given in Table 1a.
+Table 1b gives results for producing probabilistic outputs for SVMs.
+Log-loss Error2
+Errors
+MSN Web
+Gauss -60656.41 10503.30 10754
+A.Gauss -57262.26 8727.47 9675
+Laplace -45363.84 8617.59 10927
+A.Laplace -36765.88 6407.84†
+8350
+LogReg -36470.99 6525.47 8540
+LR+Noise -36468.18 6534.61 8563
+na¨ıve Bayes -1098900.83 17117.50 17834
+Reuters
+Gauss -5523.14 1124.17 1654
+A.Gauss -4929.12 652.67 888
+Laplace -5677.68 1157.33 1416
+A.Laplace -3106.95‡
+554.37‡
+726
+LogReg -3375.63 603.20 786
+LR+Noise -3374.15 604.80 785
+na¨ıve Bayes -52184.52 1969.41 2121
+TREC-AP
+Gauss -57872.57 8431.89 9705
+A.Gauss -66009.43 7826.99 8865
+Laplace -61548.42 9571.29 11442
+A.Laplace -48711.55 7251.87‡
+8642
+LogReg -48250.81 7540.60 8797
+LR+Noise -48251.51 7544.84 8801
+na¨ıve Bayes -1903487.10 41770.21 43661
+Log-loss Error2
+Errors
+MSN Web
+Gauss -54463.32 9090.57 10555
+A. Gauss -44363.70 6907.79 8375
+Laplace -42429.25 7669.75 10201
+A. Laplace -31133.83 5003.32 6170
+LogReg -30209.36 5158.74 6480
+LR+Noise -30294.01 5209.80 6551
+Linear SVM N/A N/A 6602
+Reuters
+Gauss -3955.33 589.25 735
+A. Gauss -4580.46 428.21 532
+Laplace -3569.36 640.19 770
+A. Laplace -2599.28 412.75 505
+LogReg -2575.85 407.48 509
+LR+Noise -2567.68 408.82 516
+Linear SVM N/A N/A 516
+TREC-AP
+Gauss -54620.94 6525.71 7321
+A. Gauss -77729.49 6062.64 6639
+Laplace -54543.19 7508.37 9033
+A. Laplace -48414.39 5761.25‡
+6572‡
+LogReg -48285.56 5914.04 6791
+LR+Noise -48214.96 5919.25 6794
+Linear SVM N/A N/A 6718
+Table 1: (a) Results for na¨ıve Bayes (left) and (b) SVM (right). The best entry for a corpus is in bold. Entries that are statistically
+significantly better than all other entries are underlined. A † denotes the method is significantly better than all other methods except
+for na¨ıve Bayes. A ‡ denotes the entry is significantly better than all other methods except for A. Gauss (and na¨ıve Bayes for the table
+on the left). The reason for this distinction in significance tests is described in the text.
+We start with general observations that result from examining
+the performance of these methods over the various corpora. The
+first is that A. Laplace, LR+Noise, and LogReg, quite clearly 
+outperform the other methods. There is usually little difference 
+between the performance of LR+Noise and LogReg (both as shown
+here and on a decision by decision basis), but this is unsurprising
+since LR+Noise just adds noisy class labels to the LogReg model.
+With respect to the three different measures, LR+Noise and 
+LogReg tend to perform slightly better (but never significantly) than
+A. Laplace at some tasks with respect to log-loss and squared error.
+However, A. Laplace always produces the least number of errors
+for all of the tasks, though at times the degree of improvement is
+not significant.
+In order to give the reader a better sense of the behavior of these
+methods, Figures 4-5 show the fits produced by the most 
+competitive of these methods versus the actual data behavior (as estimated
+nonparametrically by binning) for class Earn in Reuters. Figure 4
+shows the class-conditional densities, and thus only A. Laplace is
+shown since LogReg fits the posterior directly. Figure 5 shows the
+estimations of the log-odds, (i.e. log P (Earn|s(d))
+P (¬Earn|s(d))
+). Viewing the
+log-odds (rather than the posterior) usually enables errors in 
+estimation to be detected by the eye more easily.
+We can break things down as the sign test does and just look at
+wins and losses on the items that the methods disagree on. Looked
+at in this way only two methods (na¨ıve Bayes and A. Gauss) ever
+have more pairwise wins than A. Laplace; those two sometimes
+have more pairwise wins on log-loss and squared error even though
+the total never wins (i.e. they are dragged down by heavy penalties).
+In addition, this comparison of pairwise wins means that for
+those cases where LogReg and LR+Noise have better scores than
+A. Laplace, it would not be deemed significant by the sign test at
+any level since they do not have more wins. For example, of the
+130K binary decisions over the MSN Web dataset, A. Laplace had
+approximately 101K pairwise wins versus LogReg and LR+Noise.
+No method ever has more pairwise wins than A. Laplace for the
+error comparison nor does any method every achieve a better total.
+The basic observation made about na¨ıve Bayes in previous work
+is that it tends to produce estimates very close to zero and one [1,
+17]. This means if it tends to be right enough of the time, it will
+produce results that do not appear significant in a sign test that 
+ignores size of difference (as the one here). The totals of the squared
+error and log-loss bear out the previous observation that when it"s
+wrong it"s really wrong.
+There are several interesting points about the performance of the
+asymmetric distributions as well. First, A. Gauss performs poorly
+because (similar to na¨ıve Bayes) there are some examples where
+it is penalized a large amount. This behavior results from a 
+general tendency to perform like the picture shown in Figure 3 (note
+the crossover at the tails). While the asymmetric Gaussian tends
+to place the mode much more accurately than a symmetric 
+Gaussian, its asymmetric flexibility combined with its distance function
+causes it to distribute too much mass to the outside tails while 
+failing to fit around the mode accurately enough to compensate. Figure
+3 is actually a result of fitting the two distributions to real data. As
+a result, at the tails there can be a large discrepancy between the
+likelihood of belonging to each class. Thus when there are no 
+outliers A. Gauss can perform quite competitively, but when there is an
+0
+0.002
+0.004
+0.006
+0.008
+0.01
+0.012
+-600 -400 -200 0 200 400
+p(s(d)|Class={+,-})
+s(d) = naive Bayes log-odds
+Train
+Test
+A.Laplace
+0
+0.05
+0.1
+0.15
+0.2
+0.25
+0.3
+0.35
+0.4
+0.45
+-15 -10 -5 0 5 10 15
+p(s(d)|Class={+,-})
+s(d) = linear SVM raw score
+Train
+Test
+A.Laplace
+Figure 4: The empirical distribution of classifier scores for documents in the training and the test set for class Earn in Reuters.
+Also shown is the fit of the asymmetric Laplace distribution to the training score distribution. The positive class (i.e. Earn) is the
+distribution on the right in each graph, and the negative class (i.e. ¬Earn) is that on the left in each graph.
+-6
+-4
+-2
+0
+2
+4
+6
+8
+-250 -200 -150 -100 -50 0 50 100 150
+LogOdds=logP(+|s(d))-logP(-|s(d))
+s(d) = naive Bayes log-odds
+Train
+Test
+A.Laplace
+LogReg
+-5
+0
+5
+10
+15
+-4 -2 0 2 4 6
+LogOdds=logP(+|s(d))-logP(-|s(d))
+s(d) = linear SVM raw score
+Train
+Test
+A.Laplace
+LogReg
+Figure 5: The fit produced by various methods compared to the empirical log-odds of the training data for class Earn in Reuters.
+outlier A. Gauss is penalized quite heavily. There are enough such
+cases overall that it seems clearly inferior to the top three methods.
+However, the asymmetric Laplace places much more emphasis
+around the mode (Figure 4) because of the different distance 
+function (think of the sharp peak of an exponential). As a result most
+of the mass stays centered around the mode, while the asymmetric
+parameters still allow more flexibility than the standard Laplace.
+Since the standard Laplace also corresponds to a piecewise fit in the
+log-odds space, this highlights that part of the power of the 
+asymmetric methods is their sensitivity in placing the knots at the actual
+modes - rather than the symmetric assumption that the means 
+correspond to the modes. Additionally, the asymmetric methods have
+greater flexibility in fitting the slopes of the line segments as well.
+Even in cases where the test distribution differs from the training
+distribution (Figure 4), A. Laplace still yields a solution that gives
+a better fit than LogReg (Figure 5), the next best competitor.
+Finally, we can make a few observations about the usefulness
+of the various performance metrics. First, log-loss only awards a
+finite amount of credit as the degree to which something is 
+correct improves (i.e. there are diminishing returns as it approaches
+zero), but it can infinitely penalize for a wrong estimate. Thus, it
+is possible for one outlier to skew the totals, but misclassifying this
+example may not matter for any but a handful of actual utility 
+functions used in practice. Secondly, squared error has a weakness in
+the other direction. That is, its penalty and reward are bounded in
+[0, 1], but if the number of errors is small enough, it is possible for
+a method to appear better when it is producing what we generally
+consider unhelpful probability estimates. For example, consider a
+method that only estimates probabilities as zero or one (which na¨ıve
+Bayes tends to but doesn"t quite reach if you use smoothing). This
+method could win according to squared error, but with just one 
+error it would never perform better on log-loss than any method that
+assigns some non-zero probability to each outcome. For these 
+reasons, we recommend that neither of these are used in isolation as
+they each give slightly different insights to the quality of the 
+estimates produced. These observations are straightforward from the
+definitions but are underscored by the evaluation.
+5. FUTURE WORK
+A promising extension to the work presented here is a hybrid
+distribution of a Gaussian (on the outside slopes) and exponentials
+(on the inner slopes). From the empirical evidence presented in
+[22], the expectation is that such a distribution might allow more
+emphasis of the probability mass around the modes (as with the
+exponential) while still providing more accurate estimates toward
+the tails.
+Just as logistic regression allows the log-odds of the posterior
+distribution to be fit directly with a line, we could directly fit the
+log-odds of the posterior with a three-piece line (a spline) instead of
+indirectly doing the same thing by fitting the asymmetric Laplace.
+This approach may provide more power since it retains the 
+asymmetry assumption but not the assumption that the class-conditional
+densities are from an asymmetric Laplace.
+Finally, extending these methods to the outputs of other 
+discriminative classifiers is an open area. We are currently evaluating the
+appropriateness of these methods for the output of a voted 
+perceptron [11]. By analogy to the log-odds, the operative score that 
+appears promising is log
+weight perceptrons voting +
+weight perceptrons voting −
+.
+6. SUMMARY AND CONCLUSIONS
+We have reviewed a wide variety of parametric methods for 
+producing probability estimates from the raw scores of a discriminative
+classifier and for recalibrating an uncalibrated probabilistic 
+classifier. In addition, we have introduced two new families that attempt
+to capitalize on the asymmetric behavior that tends to arise from
+learning a discrimination function. We have given an efficient way
+to estimate the parameters of these distributions.
+While these distributions attempt to strike a balance between the
+generalization power of parametric distributions and the flexibility
+that the added asymmetric parameters give, the asymmetric 
+Gaussian appears to have too great of an emphasis away from the modes.
+In striking contrast, the asymmetric Laplace distribution appears to
+be preferable over several large text domains and a variety of 
+performance measures to the primary competing parametric methods,
+though comparable performance is sometimes achieved with one
+of two varieties of logistic regression. Given the ease of 
+estimating the parameters of this distribution, it is a good first choice for
+producing quality probability estimates.
+Acknowledgments
+We are grateful to Francisco Pereira for the sign test code, Anton
+Likhodedov for logistic regression code, and John Platt for the code
+support for the linear SVM classifier toolkit Smox. Also, we 
+sincerely thank Chris Meek and John Platt for the very useful advice
+provided in the early stages of this work. Thanks also to Jaime
+Carbonell and John Lafferty for their useful feedback on the final
+versions of this paper.
+7. REFERENCES
+[1] P. N. Bennett. Assessing the calibration of naive bayes"
+posterior estimates. Technical Report CMU-CS-00-155,
+Carnegie Mellon, School of Computer Science, 2000.
+[2] P. N. Bennett. Using asymmetric distributions to improve
+classifier probabilities: A comparison of new and standard
+parametric methods. Technical Report CMU-CS-02-126,
+Carnegie Mellon, School of Computer Science, 2002.
+[3] H. Bourlard and N. Morgan. A continuous speech
+recognition system embedding mlp into hmm. In NIPS "89,
+1989.
+[4] G. Brier. Verification of forecasts expressed in terms of
+probability. Monthly Weather Review, 78:1-3, 1950.
+[5] M. H. DeGroot and S. E. Fienberg. The comparison and
+evaluation of forecasters. Statistician, 32:12-22, 1983.
+[6] M. H. DeGroot and S. E. Fienberg. Comparing probability
+forecasters: Basic binary concepts and multivariate
+extensions. In P. Goel and A. Zellner, editors, Bayesian
+Inference and Decision Techniques. Elsevier Science
+Publishers B.V., 1986.
+[7] P. Domingos and M. Pazzani. Beyond independence:
+Conditions for the optimality of the simple bayesian
+classifier. In ICML "96, 1996.
+[8] R. Duda, P. Hart, and D. Stork. Pattern Classification. John
+Wiley & Sons, Inc., 2001.
+[9] S. T. Dumais and H. Chen. Hierarchical classification of web
+content. In SIGIR "00, 2000.
+[10] S. T. Dumais, J. Platt, D. Heckerman, and M. Sahami.
+Inductive learning algorithms and representations for text
+categorization. In CIKM "98, 1998.
+[11] Y. Freund and R. Schapire. Large margin classification using
+the perceptron algorithm. Machine Learning, 37(3):277-296,
+1999.
+[12] I. Good. Rational decisions. Journal of the Royal Statistical
+Society, Series B, 1952.
+[13] T. Joachims. Text categorization with support vector
+machines: Learning with many relevant features. In ECML
+"98, 1998.
+[14] S. Kotz, T. J. Kozubowski, and K. Podgorski. The Laplace
+Distribution and Generalizations: A Revisit with
+Applications to Communications, Economics, Engineering,
+and Finance. Birkh¨auser, 2001.
+[15] D. D. Lewis. A sequential algorithm for training text
+classifiers: Corrigendum and additional data. SIGIR Forum,
+29(2):13-19, Fall 1995.
+[16] D. D. Lewis. Reuters-21578, distribution 1.0.
+http://www.daviddlewis.com/resources/
+testcollections/reuters21578, January 1997.
+[17] D. D. Lewis and W. A. Gale. A sequential algorithm for
+training text classifiers. In SIGIR "94, 1994.
+[18] D. D. Lewis, R. E. Schapire, J. P. Callan, and R. Papka.
+Training algorithms for linear text classifiers. In SIGIR "96,
+1996.
+[19] D. Lindley, A. Tversky, and R. Brown. On the reconciliation
+of probability assessments. Journal of the Royal Statistical
+Society, 1979.
+[20] R. Manmatha, T. Rath, and F. Feng. Modeling score
+distributions for combining the outputs of search engines. In
+SIGIR "01, 2001.
+[21] A. McCallum and K. Nigam. A comparison of event models
+for naive bayes text classification. In AAAI "98, Workshop on
+Learning for Text Categorization, 1998.
+[22] J. C. Platt. Probabilistic outputs for support vector machines
+and comparisons to regularized likelihood methods. In A. J.
+Smola, P. Bartlett, B. Scholkopf, and D. Schuurmans, editors,
+Advances in Large Margin Classifiers. MIT Press, 1999.
+[23] M. Saar-Tsechansky and F. Provost. Active learning for class
+probability estimation and ranking. In IJCAI "01, 2001.
+[24] R. L. Winkler. Scoring rules and the evaluation of probability
+assessors. Journal of the American Statistical Association,
+1969.
+[25] Y. Yang and X. Liu. A re-examination of text categorization
+methods. In SIGIR "99, 1999.
+[26] B. Zadrozny and C. Elkan. Obtaining calibrated probability
+estimates from decision trees and naive bayesian classifiers.
+In ICML "01, 2001.
+[27] B. Zadrozny and C. Elkan. Reducing multiclass to binary by
+coupling probability estimates. In KDD "02, 2002.

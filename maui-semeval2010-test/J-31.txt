@@ -1,0 +1,1069 @@
+Computing the Optimal Strategy to Commit to∗
+Vincent Conitzer
+Carnegie Mellon University
+Computer Science Department
+5000 Forbes Avenue
+Pittsburgh, PA 15213, USA
+conitzer@cs.cmu.edu
+Tuomas Sandholm
+Carnegie Mellon University
+Computer Science Department
+5000 Forbes Avenue
+Pittsburgh, PA 15213, USA
+sandholm@cs.cmu.edu
+ABSTRACT
+In multiagent systems, strategic settings are often analyzed
+under the assumption that the players choose their strategies
+simultaneously. However, this model is not always realistic.
+In many settings, one player is able to commit to a 
+strategy before the other player makes a decision. Such models
+are synonymously referred to as leadership, commitment, or
+Stackelberg models, and optimal play in such models is often
+significantly different from optimal play in the model where
+strategies are selected simultaneously.
+The recent surge in interest in computing game-theoretic
+solutions has so far ignored leadership models (with the 
+exception of the interest in mechanism design, where the 
+designer is implicitly in a leadership position). In this 
+paper, we study how to compute optimal strategies to commit
+to under both commitment to pure strategies and 
+commitment to mixed strategies, in both normal-form and Bayesian
+games. We give both positive results (efficient algorithms)
+and negative results (NP-hardness results).
+Categories and Subject Descriptors
+J.4 [Computer Applications]: Social and Behavioral 
+Sciences-Economics; I.2.11 [Distributed Artificial 
+Intelligence]: Multiagent Systems; F.2 [Theory of 
+Computation]: Analysis of Algorithms and Problem Complexity
+General Terms
+Algorithms, Economics, Theory
+1. INTRODUCTION
+In multiagent systems with self-interested agents 
+(including most economic settings), the optimal action for one agent
+to take depends on the actions that the other agents take.
+To analyze how an agent should behave in such settings, the
+tools of game theory need to be applied. Typically, when a
+strategic setting is modeled in the framework of game 
+theory, it is assumed that players choose their strategies 
+simultaneously. This is especially true when the setting is
+modeled as a normal-form game, which only specifies each
+agent"s utility as a function of the vector of strategies that
+the agents choose, and does not provide any information on
+the order in which agents make their decisions and what
+the agents observe about earlier decisions by other agents.
+Given that the game is modeled in normal form, it is 
+typically analyzed using the concept of Nash equilibrium. A
+Nash equilibrium specifies a strategy for each player, such
+that no player has an incentive to individually deviate from
+this profile of strategies. (Typically, the strategies are 
+allowed to be mixed, that is, probability distributions over the
+original (pure) strategies.) A (mixed-strategy) Nash 
+equilibrium is guaranteed to exist in finite games [18], but one
+problem is that there may be multiple Nash equilibria. This
+leads to the equilibrium selection problem of how an agent
+can know which strategy to play if it does not know which
+equilibrium is to be played.
+When the setting is modeled as an extensive-form game,
+it is possible to specify that some players receive some 
+information about actions taken by others earlier in the game
+before deciding on their action. Nevertheless, in general,
+the players do not know everything that happened earlier
+in the game. Because of this, these games are typically still
+analyzed using an equilibrium concept, where one specifies
+a mixed strategy for each player, and requires that each
+player"s strategy is a best response to the others" strategies.
+(Typically an additional constraint on the strategies is now
+imposed to ensure that players do not play in a way that is
+irrational with respect to the information that they have 
+received so far. This leads to refinements of Nash equilibrium
+such as subgame perfect and sequential equilibrium.)
+However, in many real-world settings, strategies are not
+selected in such a simultaneous manner. Oftentimes, one
+player (the leader) is able to commit to a strategy before
+another player (the follower). This can be due to a 
+variety of reasons. For example, one of the players may 
+arrive at the site at which the game is to be played before
+another agent (e.g., in economic settings, one player may
+enter a market earlier and commit to a way of doing 
+busi82
+ness). Such commitment power has a profound impact on
+how the game should be played. For example, the leader
+may be best off playing a strategy that is dominated in the
+normal-form representation of the game. Perhaps the 
+earliest and best-known example of the effect of commitment is
+that by von Stackelberg [25], who showed that, in Cournot"s
+duopoly model [5], if one firm is able to commit to a 
+production quantity first, that firm will do much better than in
+the simultaneous-move (Nash) solution. In general, if 
+commitment to mixed strategies is possible, then (under minor
+assumptions) it never hurts, and often helps, to commit to
+a strategy [26]. Being forced to commit to a pure strategy
+sometimes helps, and sometimes hurts (for example, 
+committing to a pure strategy in rock-paper-scissors before the
+other player"s decision will naturally result in a loss). In
+this paper, we will assume commitment is always forced; if
+it is not, the player who has the choice of whether to 
+commit can simply compare the commitment outcome to the
+non-commitment (simultaneous-move) outcome.
+Models of leadership are especially important in settings
+with multiple self-interested software agents. Once the code
+for an agent (or for a team of agents) is finalized and the
+agent is deployed, the agent is committed to playing the
+(possibly randomized) strategy that the code prescribes. Thus,
+as long as one can credibly show that one cannot change the
+code later, the code serves as a commitment device. This
+holds true for recreational tournaments among agents (e.g.,
+poker tournaments, RoboSoccer), and for industrial 
+applications such as sensor webs.
+Finally, there is also an implicit leadership situation in the
+field of mechanism design, in which one player (the designer)
+gets to choose the rules of the game that the remaining 
+players then play. Mechanism design is an extremely important
+topic to the EC community: the papers published on 
+mechanism design in recent EC conferences are too numerous
+to cite. Indeed, the mechanism designer may benefit from
+committing to a choice that, if the (remaining) agents" 
+actions were fixed, would be suboptimal. For example, in a
+(first-price) auction, the seller may wish to set a positive
+(artificial) reserve price for the item, below which the item
+will not be sold-even if the seller values the item at 0. In
+hindsight (after the bids have come in), this (na¨ıvely) 
+appears suboptimal: if a bid exceeding the reserve price came
+in, the reserve price had no effect, and if no such bid came
+in, the seller would have been better off accepting a lower
+bid. Of course, the reason for setting the reserve price is
+that it incentivizes the bidders to bid higher, and because
+of this, setting artificial reserve prices can actually increase
+expected revenue to the seller.
+A significant amount of research has recently been 
+devoted to the computation of solutions according to various
+solution concepts for settings in which the agents choose
+their strategies simultaneously, such as dominance [7, 11, 3]
+and (especially) Nash equilibrium [8, 21, 16, 15, 2, 22, 23,
+4]. However, the computation of the optimal strategy to
+commit to in a leadership situation has gone ignored. 
+Theoretically, leadership situations can simply be thought of as
+an extensive-form game in which one player chooses a 
+strategy (for the original game) first. The number of strategies
+in this extensive-form game, however, can be exceedingly
+large. For example, if the leader is able to commit to a
+mixed strategy in the original game, then every one of the
+(continuum of) mixed strategies constitutes a pure strategy
+in the extensive-form representation of the leadership 
+situation. (We note that a commitment to a distribution is not
+the same as a distribution over commitments.) Moreover,
+if the original game is itself an extensive-form game, the
+number of strategies in the extensive-form representation of
+the leadership situation (which is a different extensive-form
+game) becomes even larger. Because of this, it is usually
+not computationally feasible to simply transform the 
+original game into the extensive-form representation of the 
+leadership situation; instead, we have to analyze the game in its
+original representation.
+In this paper, we study how to compute the optimal 
+strategy to commit to, both in normal-form games (Section 2)
+and in Bayesian games, which are a special case of 
+extensiveform games (Section 3).
+2. NORMAL-FORM GAMES
+In this section, we study how to compute the optimal
+strategy to commit to for games represented in normal form.
+2.1 Definitions
+In a normal-form game, every player i ∈ {1, . . . , n} has a
+set of pure strategies (or actions) Si, and a utility function
+ui : S1×S2×. . .×Sn → R that maps every outcome (a vector
+consisting of a pure strategy for every player, also known
+as a profile of pure strategies) to a real number. To ease
+notation, in the case of two players, we will refer to player
+1"s pure strategy set as S, and player 2"s pure strategy set
+as T. Such games can be represented in (bi-)matrix form,
+in which the rows correspond to player 1"s pure strategies,
+the columns correspond to player 2"s pure strategies, and
+the entries of the matrix give the row and column player"s
+utilities (in that order) for the corresponding outcome of the
+game. In the case of three players, we will use R, S, and T,
+for player 1, 2, and 3"s pure strategies, respectively. A mixed
+strategy for a player is a probability distribution over that
+player"s pure strategies. In the case of two-player games,
+we will refer to player 1 as the leader and player 2 as the
+follower.
+Before defining optimal leadership strategies, consider the
+following game which illustrates the effect of the leader"s
+ability to commit.
+2, 1 4, 0
+1, 0 3, 1
+In this normal-form representation, the bottom strategy
+for the row player is strictly dominated by the top strategy.
+Nevertheless, if the row player has the ability to commit to
+a pure strategy before the column player chooses his 
+strategy, the row player should commit to the bottom strategy:
+doing so will make the column player prefer to play the
+right strategy, leading to a utility of 3 for the row player.
+By contrast, if the row player were to commit to the top
+strategy, the column player would prefer to play the left
+strategy, leading to a utility of only 2 for the row player. If
+the row player is able to commit to a mixed strategy, then
+she can get an even greater (expected) utility: if the row
+player commits to placing probability p > 1/2 on the 
+bottom strategy, then the column player will still prefer to play
+the right strategy, and the row player"s expected utility will
+be 3p + 4(1 − p) = 4 − p ≥ 3. If the row player plays each
+strategy with probability exactly 1/2, the column player is
+83
+indifferent between the strategies. In such cases, we will 
+assume that the column player will choose the strategy that
+maximizes the row player"s utility (in this case, the right
+strategy). Hence, the optimal mixed strategy to commit to
+for the row player is p = 1/2. There are a few good 
+reasons for this assumption. If we were to assume the opposite,
+then there would not exist an optimal strategy for the row
+player in the example game: the row player would play the
+bottom strategy with probability p = 1/2 + with > 0,
+and the smaller , the better the utility for the row player.
+By contrast, if we assume that the follower always breaks
+ties in the leader"s favor, then an optimal mixed strategy
+for the leader always exists, and this corresponds to a 
+subgame perfect equilibrium of the extensive-form 
+representation of the leadership situation. In any case, this is a 
+standard assumption for such models (e.g. [20]), although some
+work has investigated what can happen in the other 
+subgame perfect equilibria [26]. (For generic two-player games,
+the leader"s subgame-perfect equilibrium payoff is unique.)
+Also, the same assumption is typically used in mechanism
+design, in that it is assumed that if an agent is indifferent 
+between revealing his preferences truthfully and revealing them
+falsely, he will report them truthfully. Given this 
+assumption, we can safely refer to optimal leadership strategies
+rather than having to use some equilibrium notion.
+Hence, for the purposes of this paper, an optimal strategy
+to commit to in a 2-player game is a strategy s ∈ S that
+maximizes maxt∈BR(s) ul(s, t), where BR(s) =
+arg maxt∈T uf (s, t). (ul and uf are the leader and follower"s
+utility functions, respectively.) We can have S = S for the
+case of commitment to pure strategies, or S = ∆(S), the
+set of probability distributions over S, for the case of 
+commitment to mixed strategies. (We note that replacing T
+by ∆(T) makes no difference in this definition.) For games
+with more than two players, in which the players commit
+to their strategies in sequence, we define optimal strategies
+to commit to recursively. After the leader commits to a
+strategy, the game to be played by the remaining agents is
+itself a (smaller) leadership game. Thus, we define an 
+optimal strategy to commit to as a strategy that maximizes
+the leader"s utility, assuming that the play of the remaining
+agents is itself optimal under this definition, and maximizes
+the leader"s utility among all optimal ways to play the 
+remaining game. Again, commitment to mixed strategies may
+or may not be a possibility for every player (although for the
+last player it does not matter if we allow for commitment to
+mixed strategies).
+2.2 Commitment to pure strategies
+We first study how to compute the optimal pure strategy
+to commit to. This is relatively simple, because the number
+of strategies to commit to is not very large. (In the following,
+#outcomes is the number of complete strategy profiles.)
+Theorem 1. Under commitment to pure strategies, the
+set of all optimal strategy profiles in a normal-form game
+can be found in O(#players · #outcomes) time.
+Proof. Each pure strategy that the first player may 
+commit to will induce a subgame for the remaining players. We
+can solve each such subgame recursively to find all of its
+optimal strategy profiles; each of these will give the 
+original leader some utility. Those that give the leader maximal
+utility correspond exactly to the optimal strategy profiles of
+the original game.
+We now present the algorithm formally. Let Su(G, s1) be
+the subgame that results after the first (remaining) player
+in G plays s1 ∈ SG
+1 . A game with 0 players is simply an
+outcome of the game. The function Append(s, O) appends
+the strategy s to each of the vectors of strategies in the set
+O. Let e be the empty vector with no elements. In a slight
+abuse of notation, we will write uG
+1 (C) when all strategy
+profiles in the set C give player 1 the same utility in the
+game G. (Here, player 1 is the first remaining player in the
+subgame G, not necessarily player 1 in the original game.)
+We note that arg max is set-valued. Then, the following
+algorithm computes all optimal strategy profiles:
+Algorithm Solve(G)
+if G has 0 players
+return {e}
+C ← ∅
+for all s1 ∈ SG
+1 {
+O ← Solve(Su(G, s1))
+O ← arg maxo∈O uG
+1 (s1, o)
+if C = ∅ or uG
+1 (s1, O ) = uG
+1 (C)
+C ← C∪Append(s1, O )
+if uG
+1 (s1, O ) > uG
+1 (C)
+C ←Append(s1, O )
+}
+return C
+Every outcome is (potentially) examined by every player,
+which leads to the given runtime bound.
+As an example of how the algorithm works, consider the
+following 3-player game, in which the first player chooses
+the left or right matrix, the second player chooses a row,
+and the third player chooses a column.
+0,1,1 1,1,0 1,0,1
+2,1,1 3,0,1 1,1,1
+0,0,1 0,0,0 3,3,0
+3,3,0 0,2,0 3,0,1
+4,4,2 0,0,2 0,0,0
+0,5,1 0,0,0 3,0,0
+First we eliminate the outcomes that do not correspond
+to best responses for the third player (removing them from
+the matrix):
+0,1,1 1,0,1
+2,1,1 3,0,1 1,1,1
+0,0,1
+3,0,1
+4,4,2 0,0,2
+0,5,1
+Next, we remove the entries in which the third player
+does not break ties in favor of the second player, as well
+as entries that do not correspond to best responses for the
+second player.
+0,1,1
+2,1,1 1,1,1
+0,5,1
+Finally, we remove the entries in which the second and
+third players do not break ties in favor of the first player, as
+well as entries that do not correspond to best responses for
+the first player.
+2,1,1
+84
+Hence, in optimal play, the first player chooses the left
+matrix, the second player chooses the middle row, and the
+third player chooses the left column. (We note that this
+outcome is Pareto-dominated by (Right, Middle, Left).)
+For general normal-form games, each player"s utility for
+each of the outcomes has to be explicitly represented in the
+input, so that the input size is itself Ω(#players · #outcomes).
+Therefore, the algorithm is in fact a linear-time algorithm.
+2.3 Commitment to mixed strategies
+In the special case of two-player zero-sum games, 
+computing an optimal mixed strategy for the leader to commit to
+is equivalent to computing a minimax strategy, which 
+minimizes the maximum expected utility that the opponent can
+obtain. Minimax strategies constitute the only natural 
+solution concept for two-player zero-sum games: von Neumann"s
+Minimax Theorem [24] states that in two-player zero-sum
+games, it does not matter (in terms of the players" utilities)
+which player gets to commit to a mixed strategy first, and a
+profile of mixed strategies is a Nash equilibrium if and only
+if both strategies are minimax strategies. It is well-known
+that a minimax strategy can be found in polynomial time,
+using linear programming [17]. Our first result in this 
+section generalizes this result, showing that an optimal mixed
+strategy for the leader to commit to can be efficiently 
+computed in general-sum two-player games, again using linear
+programming.
+Theorem 2. In 2-player normal-form games, an optimal
+mixed strategy to commit to can be found in polynomial time
+using linear programming.
+Proof. For every pure follower strategy t, we compute a
+mixed strategy for the leader such that 1) playing t is a best
+response for the follower, and 2) under this constraint, the
+mixed strategy maximizes the leader"s utility. Such a mixed
+strategy can be computed using the following simple linear
+program:
+maximize
+s∈S
+psul(s, t)
+subject to
+for all t ∈ T,
+s∈S
+psuf (s, t) ≥
+s∈S
+psuf (s, t )
+s∈S
+ps = 1
+We note that this program may be infeasible for some
+follower strategies t, for example, if t is a strictly 
+dominated strategy. Nevertheless, the program must be feasible
+for at least some follower strategies; among these follower
+strategies, choose a strategy t∗
+that maximizes the linear
+program"s solution value. Then, if the leader chooses as her
+mixed strategy the optimal settings of the variables ps for
+the linear program for t∗
+, and the follower plays t∗
+, this
+constitutes an optimal strategy profile.
+In the following result, we show that we cannot expect to
+solve the problem more efficiently than linear programming,
+because we can reduce any linear program with a probability
+constraint on its variables to a problem of computing the
+optimal mixed strategy to commit to in a 2-player 
+normalform game.
+Theorem 3. Any linear program whose variables xi (with
+xi ∈ R≥0
+) must satsify
+i
+xi = 1 can be modeled as a 
+problem of computing the optimal mixed strategy to commit to in
+a 2-player normal-form game.
+Proof. Let the leader have a pure strategy i for every
+variable xi. Let the column player have one pure 
+strategy j for every constraint in the linear program (other than
+i
+xi = 1), and a single additional pure strategy 0. Let the
+utility functions be as follows. Writing the objective of the
+linear program as maximize
+i
+cixi, for any i, let ul(i, 0) =
+ci and uf (i, 0) = 0. Writing the jth constraint of the linear
+program (not including
+i
+xi = 1) as
+i
+aijxi ≤ bj, for any
+i, j > 0, let ul(i, j) = mini ci − 1 and uf (i, j) = aij − bj.
+For example, consider the following linear program.
+maximize 2x1 + x2
+subject to
+x1 + x2 = 1
+5x1 + 2x2 ≤ 3
+7x1 − 2x2 ≤ 2
+The optimal solution to this program is x1 = 1/3, x2 =
+2/3. Our reduction transforms this program into the 
+following leader-follower game (where the leader is the row
+player).
+2, 0 0, 2 0, 5
+1, 0 0, -1 0, -4
+Indeed, the optimal strategy for the leader is to play the
+top strategy with probability 1/3 and the bottom strategy
+with probability 2/3. We now show that the reduction works
+in general.
+Clearly, the leader wants to incentivize the follower to play
+0, because the utility that the leader gets when the follower
+plays 0 is always greater than when the follower does not
+play 0. In order for the follower not to prefer playing j > 0
+rather than 0, it must be the case that
+i
+pl(i)(aij − bj) ≤
+0, or equivalently
+i
+pl(i)aij ≤ bj. Hence the leader will
+get a utility of at least mini ci if and only if there is a
+feasible solution to the constraints. Given that the pl(i)
+incentivize the follower to play 0, the leader attempts to
+maximize
+i
+pl(i)ci. Thus the leader must solve the original
+linear program.
+As an alternative proof of Theorem 3, one may observe
+that it is known that finding a minimax strategy in a 
+zerosum game is as hard as the linear programming problem [6],
+and as we pointed out at the beginning of this section, 
+computing a minimax strategy in a zero-sum game is a special
+case of the problem of computing an optimal mixed strategy
+to commit to.
+This polynomial-time solvability of the problem of 
+computing an optimal mixed strategy to commit to in two-player
+normal-form games contrasts with the unknown complexity
+of computing a Nash equilibrium in such games [21], as well
+as with the NP-hardness of finding a Nash equilibrium with
+maximum utility for a given player in such games [8, 2].
+Unfortunately, this result does not generalize to more than
+two players-here, the problem becomes NP-hard. To show
+this, we reduce from the VERTEX-COVER problem.
+Definition 1. In VERTEX-COVER, we are given a graph
+G = (V, E) and an integer K. We are asked whether there
+85
+exists a subset of the vertices S ⊆ V , with |S| = K, such
+that every edge e ∈ E has at least one of its endpoints in S.
+BALANCED-VERTEX-COVER is the special case of
+VERTEX-COVER in which K = |V |/2.
+VERTEX-COVER is NP-complete [9]. The following
+lemma shows that the hardness remains if we require K =
+|V |/2. (Similar results have been shown for other NP-complete
+problems.)
+Lemma 1. BALANCED-VERTEX-COVER is
+NP-complete.
+Proof. Membership in NP follows from the fact that
+the problem is a special case of VERTEX-COVER, which
+is in NP. To show NP-hardness, we reduce an arbitrary
+VERTEX-COVER instance to a 
+BALANCED-VERTEXCOVER instance, as follows. If, for the VERTEX-COVER
+instance, K > |V |/2, then we simply add isolated vertices
+that are disjoint from the rest of the graph, until K = |V |/2.
+If K < |V |/2, we add isolated triangles (that is, the 
+complete graph on three vertices) to the graph, increasing K by
+2 every time, until K = |V |/2.
+Theorem 4. In 3-player normal-form games, finding an
+optimal mixed strategy to commit to is NP-hard.
+Proof. We reduce an arbitrary 
+BALANCED-VERTEXCOVER instance to the following 3-player normal-form game.
+For every vertex v, each of the three players has a pure 
+strategy corresponding to that vertex (rv, sv, tv, respectively). In
+addition, for every edge e, the third player has a pure 
+strategy te; and finally, the third player has one additional pure
+strategy t0. The utilities are as follows:
+• for all r ∈ R, s ∈ S, u1(r, s, t0) = u2(r, s, t0) = 1;
+• for all r ∈ R, s ∈ S, t ∈ T−{t0}, u1(r, s, t) = u2(r, s, t) =
+0;
+• for all v ∈ V, s ∈ S, u3(rv, s, tv) = 0;
+• for all v ∈ V, r ∈ R, u3(r, sv, tv) = 0;
+• for all v ∈ V , for all r ∈ R − {rv}, s ∈ S − {sv},
+u3(r, s, tv) = |V |
+|V |−2
+;
+• for all e ∈ E, s ∈ S, for both v ∈ e, u3(rv, s, te) = 0;
+• for all e ∈ E, s ∈ S, for all v /∈ e, u3(rv, s, te) = |V |
+|V |−2
+.
+• for all r ∈ R, s ∈ S, u3(r, s, t0) = 1.
+We note that players 1 and 2 have the same utility function.
+We claim that there is an optimal strategy profile in which
+players 1 and 2 both obtain 1 (their maximum utility) if
+and only if there is a solution to the 
+BALANCED-VERTEXCOVER problem. (Otherwise, these players will both obtain
+0.)
+First, suppose there exists a solution to the 
+BALANCEDVERTEX-COVER problem. Then, let player 1 play every
+rv such that v is in the cover with probability 2
+|V |
+, and let
+player 2 play every sv such that v is not in the cover with
+probability 2
+|V |
+. Then, for player 3, the expected utility
+of playing tv (for any v) is (1 − 2
+|V |
+) |V |
+|V |−2
+= 1, because
+there is a chance of 2
+|V |
+that rv or sv is played. 
+Additionally, the expected utility of playing te (for any e) is at most
+(1 − 2
+|V |
+) |V |
+|V |−2
+= 1, because there is a chance of at least
+2
+|V |
+that some rv with v ∈ e is played (because player 1 is
+randomizing over the pure strategies corresponding to the
+cover). It follows that playing t0 is a best response for player
+3, giving players 1 and 2 a utility of 1.
+Now, suppose that players 1 and 2 obtain 1 in optimal
+play. Then, it must be the case that player 3 plays t0. Hence,
+for every v ∈ V , there must be a probability of at least 2
+|V |
+that either rv or sv is played, for otherwise player 3 would
+be better off playing tv. Because players 1 and 2 have only
+a total probability of 2 to distribute, it must be the case
+that for each v, either rv or sv is played with probability
+2
+|V |
+, and the other is played with probability 0. (It is not
+possible for both to have nonzero probability, because then
+there would be some probability that both are played 
+simultaneously (correlation is not possible), hence the total
+probability of at least one being played could not be high
+enough for all vertices.) Thus, for exactly half the v ∈ V ,
+player 1 places probability 2
+|V |
+on rv. Moreover, for every
+e ∈ E, there must be a probability of at least 2
+|V |
+that some
+rv with v ∈ e is played, for otherwise player 3 would be 
+better off playing te. Thus, the v ∈ V such that player 1 places
+probability 2
+|V |
+on rv constitute a balanced vertex cover.
+3. BAYESIAN GAMES
+So far, we have restricted our attention to normal-form
+games. In a normal-form game, it is assumed that every
+agent knows every other agent"s preferences over the 
+outcomes of the game. In general, however, agents may have
+some private information about their preferences that is not
+known to the other agents. Moreover, at the time of 
+commitment to a strategy, the agents may not even know their
+own (final) preferences over the outcomes of the game yet,
+because these preferences may be dependent on a context
+that has yet to materialize. For example, when the code for
+a trading agent is written, it may not yet be clear how that
+agent will value resources that it will negotiate over later,
+because this depends on information that is not yet 
+available at the time at which the code is written (such as orders
+that will have been placed to the agent before the 
+negotiation). In this section, we will study commitment in Bayesian
+games, which can model such uncertainty over preferences.
+3.1 Definitions
+In a Bayesian game, every player i has a set of actions Si,
+a set of types Θi with an associated probability distribution
+πi : Θi → [0, 1], and, for each type θi, a utility function
+uθi
+i : S1 × S2 × . . . × Sn → R. A pure strategy in a Bayesian
+game is a mapping from the player"s types to actions, σi :
+Θi → Si. (Bayesian games can be rewritten in normal form
+by enumerating every pure strategy σi, but this will cause
+an exponential blowup in the size of the representation of
+the game and therefore cannot lead to efficient algorithms.)
+The strategy that the leader should commit to depends
+on whether, at the time of commitment, the leader knows
+her own type. If the leader does know her own type, the
+other types that the leader might have had become 
+irrelevant and the leader should simply commit to the strategy
+that is optimal for the type. However, as argued above, the
+leader does not necessarily know her own type at the time of
+commitment (e.g., the time at which the code is submitted).
+In this case, the leader must commit to a strategy that is
+86
+dependent upon the leader"s eventual type. We will study
+this latter model, although we will pay specific attention to
+the case where the leader has only a single type, which is
+effectively the same as the former model.
+3.2 Commitment to pure strategies
+It turns out that computing an optimal pure strategy to
+commit to is hard in Bayesian games, even with two players.
+Theorem 5. Finding an optimal pure strategy to commit
+to in 2-player Bayesian games is NP-hard, even when the
+follower has only a single type.
+Proof. We reduce an arbitrary VERTEX-COVER 
+instance to the following Bayesian game between the leader
+and the follower. The leader has K types θ1, θ2, . . . , θK ,
+each occurring with probability 1/K, and for every vertex
+v ∈ V , the leader has an action sv. The follower has only a
+single type; for each edge e ∈ E, the follower has an action
+te, and the follower has a single additional action t0. The
+utility function for the leader is given by, for all θl ∈ Θl and
+all s ∈ S, u
+θl
+l (s, t0) = 1, and for all e ∈ E, u
+θl
+l (s, te) = 0.
+The follower"s utility is given by:
+• For all v ∈ V , for all e ∈ E with v /∈ e, uf (sv, te) = 1;
+• For all v ∈ V , for all e ∈ E with v ∈ e, uf (sv, te) =
+−K;
+• For all v ∈ V , uf (sv, t0) = 0.
+We claim that the leader can get a utility of 1 if and only if
+there is a solution to the VERTEX-COVER instance.
+First, suppose that there is a solution to the 
+VERTEXCOVER instance. Then, the leader can commit to a pure
+strategy such that for each vertex v in the cover, the leader
+plays sv for some type. Then, the follower"s utility for 
+playing te (for any e ∈ E) is at most K−1
+K
++ 1
+K
+(−K) = − 1
+K
+,
+so that the follower will prefer to play t0, which gives the
+leader a utility of 1, as required.
+Now, suppose that there is a pure strategy for the leader
+that will give the leader a utility of 1. Then, the follower
+must play t0. In order for the follower not to prefer playing te
+(for any e ∈ E) instead, for at least one v ∈ e the leader must
+play sv for some type θl. Hence, the set of vertices v that the
+leader plays for some type must constitute a vertex cover;
+and this set can have size at most K, because the leader
+has only K types. So there is a solution to the 
+VERTEXCOVER instance.
+However, if the leader has only a single type, then the
+problem becomes easy again (#types is the number of types
+for the follower):
+Theorem 6. In 2-player Bayesian games in which the
+leader has only a single type, an optimal pure strategy to
+commit to can be found in O(#outcomes · #types) time.
+Proof. For every leader action s, we can compute, for
+every follower type θf ∈ Θf , which actions t maximize the
+follower"s utility; call this set of actions BRθf (s). Then, the
+utility that the leader receives for committing to action s
+can be computed as
+θf ∈Θf
+π(θf ) maxt∈BRθf
+(s) ul(s, t), and
+the leader can choose the best action to commit to.
+3.3 Commitment to mixed strategies
+In two-player zero-sum imperfect information games with
+perfect recall (no player ever forgets something that it once
+knew), a minimax strategy can be constructed in polynomial
+time [12, 13]. Unfortunately, this result does not extend to
+computing optimal mixed strategies to commit to in the
+general-sum case-not even in Bayesian games. We will 
+exhibit NP-hardness by reducing from the 
+INDEPENDENTSET problem.
+Definition 2. In INDEPENDENT-SET, we are given a
+graph G = (V, E) and an integer K. We are asked whether
+there exists a subset of the vertices S ⊆ V , with |S| = K,
+such that no edge e ∈ E has both of its endpoints in S.
+Again, this problem is NP-complete [9].
+Theorem 7. Finding an optimal mixed strategy to 
+commit to in 2-player Bayesian games is NP-hard, even when
+the leader has only a single type and the follower has only
+two actions.
+Proof. We reduce an arbitrary INDEPENDENT-SET
+instance to the following Bayesian game between the leader
+and the follower. The leader has only a single type, and for
+every vertex v ∈ V , the leader has an action sv. The follower
+has a type θv for every v ∈ V , occurring with probability
+1
+(|E|+1)|V |
+, and a type θe for every e ∈ E, occurring with
+probability 1
+|E|+1
+. The follower has two actions: t0 and t1.
+The leader"s utility is given by, for all s ∈ S, ul(s, t0) = 1
+and ul(s, t1) = 0. The follower"s utility is given by:
+• For all v ∈ V , uθv
+f (sv, t1) = 0;
+• For all v ∈ V and s ∈ S − {sv}, uθv
+f (s, t1) = K
+K−1
+;
+• For all v ∈ V and s ∈ S, uθv
+f (s, t0) = 1;
+• For all e ∈ E, s ∈ S, uθe
+f (s, t0) = 1;
+• For all e ∈ E, for both v ∈ e, uθe
+f (sv, t1) = 2K
+3
+;
+• For all e ∈ E, for all v /∈ e, uθe
+f (sv, t1) = 0.
+We claim that an optimal strategy to commit to gives the
+leader an expected utility of at least |E|
+|E|+1
++ K
+(|E|+1)|V |
+if
+and only if there is a solution to the INDEPENDENT-SET
+instance.
+First, suppose that there is a solution to the
+INDEPENDENT-SET instance. Then, the leader could 
+commit to the following strategy: for every vertex v in the 
+independent set, play the corresponding sv with probability
+1/K. If the follower has type θe for some e ∈ E, the expected
+utility for the follower of playing t1 is at most 1
+K
+2K
+3
+= 2/3,
+because there is at most one vertex v ∈ e such that sv is
+played with nonzero probability. Hence, the follower will
+play t0 and obtain a utility of 1. If the follower has type
+θv for some vertex v in the independent set, the expected
+utility for the follower of playing t1 is K−1
+K
+K
+K−1
+= 1, because
+the leader plays sv with probability 1/K. It follows that the
+follower (who breaks ties to maximize the leader"s utility)
+will play t0, which also gives a utility of 1 and gives the
+leader a higher utility. Hence the leader"s expected utility
+for this strategy is at least |E|
+|E|+1
++ K
+(|E|+1)|V |
+, as required.
+87
+Now, suppose that there is a strategy that gives the leader
+an expected utility of at least |E|
+|E|+1
++ K
+(|E|+1)|V |
+. Then, this
+strategy must induce the follower to play t0 whenever it
+has a type of the form θe (because otherwise, the utility
+could be at most |E|−1
+|E|+1
++ |V |
+(|E|+1)|V |
+= |E|
+|E|+1
+< |E|
+|E|+1
++
+K
+(|E|+1)|V |
+). Thus, it cannot be the case that for some edge
+e = (v1, v2) ∈ E, the probability that the leader plays one of
+sv1 and sv2 is at least 2/K, because then the expected utility
+for the follower of playing t1 when it has type θe would be at
+least 2
+K
+2K
+3
+= 4/3 > 1. Moreover, the strategy must induce
+the follower to play t0 for at least K types of the form θv.
+Inducing the follower to play t0 when it has type θv can
+be done only by playing sv with probability at least 1/K,
+which will give the follower a utility of at most K−1
+K
+K
+K−1
+= 1
+for playing t1. But then, the set of vertices v such that sv
+is played with probability at least 1/K must constitute an
+independent set of size K (because if there were an edge e
+between two such vertices, it would induce the follower to
+play t1 for type θe by the above).
+By contrast, if the follower has only a single type, then we
+can generalize the linear programming approach for 
+normalform games:
+Theorem 8. In 2-player Bayesian games in which the
+follower has only a single type, an optimal mixed strategy
+to commit to can be found in polynomial time using linear
+programming.
+Proof. We generalize the approach in Theorem 2 as 
+follows. For every pure follower strategy t, we compute a mixed
+strategy for the leader for every one of the leader"s types
+such that 1) playing t is a best response for the follower,
+and 2) under this constraint, the mixed strategy maximizes
+the leader"s ex ante expected utility. To do so, we generalize
+the linear program as follows:
+maximize
+θl∈Θl
+π(θl)
+s∈S
+pθl
+s uθl
+l (s, t)
+subject to
+for all t ∈ T,
+θl∈Θl
+π(θl)
+s∈S
+p
+θl
+s uf (s, t) ≥
+θl∈Θl
+π(θl)
+s∈S
+p
+θl
+s uf (s, t )
+for all θl ∈ Θl,
+s∈S
+p
+θl
+s = 1
+As in Theorem 2, the solution for the linear program that
+maximizes the solution value is an optimal strategy to 
+commit to.
+This shows an interesting contrast between commitment
+to pure strategies and commitment to mixed strategies in
+Bayesian games: for pure strategies, the problem becomes
+easy if the leader has only a single type (but not if the 
+follower has only a single type), whereas for mixed strategies,
+the problem becomes easy if the follower has only a single
+type (but not if the leader has only a single type).
+4. CONCLUSIONS AND FUTURE
+RESEARCH
+In multiagent systems, strategic settings are often 
+analyzed under the assumption that the players choose their
+strategies simultaneously. This requires some equilibrium
+notion (Nash equilibrium and its refinements), and often
+leads to the equilibrium selection problem: it is unclear to
+each individual player according to which equilibrium she
+should play. However, this model is not always realistic. In
+many settings, one player is able to commit to a strategy
+before the other player makes a decision. For example, one
+agent may arrive at the (real or virtual) site of the game
+before the other, or, in the specific case of software agents,
+the code for one agent may be completed and committed 
+before that of another agent. Such models are synonymously
+referred to as leadership, commitment, or Stackelberg 
+models, and optimal play in such models is often significantly
+different from optimal play in the model where strategies
+are selected simultaneously. Specifically, if commitment to
+mixed strategies is possible, then (optimal) commitment
+never hurts the leader, and often helps.
+The recent surge in interest in computing game-theoretic
+solutions has so far ignored leadership models (with the 
+exception of the interest in mechanism design, where the 
+designer is implicitly in a leadership position). In this paper,
+we studied how to compute optimal strategies to commit
+to under both commitment to pure strategies and 
+commitment to mixed strategies, in both normal-form and Bayesian
+games. For normal-form games, we showed that the optimal
+pure strategy to commit to can be found efficiently for any
+number of players. An optimal mixed strategy to commit
+to in a normal-form game can be found efficiently for two
+players using linear programming (and no more efficiently
+than that, in the sense that any linear program with a 
+probability constraint can be encoded as such a problem). (This
+is a generalization of the polynomial-time computability of
+minimax strategies in normal-form games.) The problem
+becomes NP-hard for three (or more) players. In Bayesian
+games, the problem of finding an optimal pure strategy to
+commit to is NP-hard even in two-player games in which the
+follower has only a single type, although two-player games
+in which the leader has only a single type can be solved
+efficiently. The problem of finding an optimal mixed 
+strategy to commit to in a Bayesian game is NP-hard even in
+two-player games in which the leader has only a single type,
+although two-player games in which the follower has only a
+single type can be solved efficiently using a generalization
+of the linear progamming approach for normal-form games.
+The following two tables summarize these results.
+2 players ≥ 3 players
+normal-form O(#outcomes) O(#outcomes·
+#players)
+Bayesian, O(#outcomes· NP-hard
+1-type leader #types)
+Bayesian, NP-hard NP-hard
+1-type follower
+Bayesian (general) NP-hard NP-hard
+Results for commitment to pure strategies. (With more
+than 2 players, the follower is the last player to commit,
+the leader is the first.)
+88
+2 players ≥ 3 players
+normal-form one LP-solve per NP-hard
+follower action
+Bayesian, NP-hard NP-hard
+1-type leader
+Bayesian, one LP-solve per NP-hard
+1-type follower follower action
+Bayesian (general) NP-hard NP-hard
+Results for commitment to mixed strategies. (With more
+than 2 players, the follower is the last player to commit,
+the leader is the first.)
+Future research can take a number of directions. First,
+we can empirically evaluate the techniques presented here on
+test suites such as GAMUT [19]. We can also study the 
+computation of optimal strategies to commit to in other1
+
+concise representations of normal-form games-for example, in
+graphical games [10] or local-effect/action graph games [14,
+1]. For the cases where computing an optimal strategy to
+commit to is NP-hard, we can also study the computation
+of approximately optimal strategies to commit to. While the
+correct definition of an approximately optimal strategy is in
+this setting may appear simple at first-it should be a 
+strategy that, if the following players play optimally, performs
+almost as well as the optimal strategy in expectation-this
+definition becomes problematic when we consider that the
+other players may also be playing only approximately 
+optimally. One may also study models in which multiple (but
+not all) players commit at the same time.
+Another interesting direction to pursue is to see if 
+computing optimal mixed strategies to commit to can help us
+in, or otherwise shed light on, computing Nash equilibria.
+Often, optimal mixed strategies to commit to are also Nash
+equilibrium strategies (for example, in two-player zero-sum
+games this is always true), although this is not always the
+case (for example, as we already pointed out, sometimes the
+optimal strategy to commit to is a strictly dominated 
+strategy, which can never be a Nash equilibrium strategy).
+5. REFERENCES
+[1] N. A. R. Bhat and K. Leyton-Brown. Computing
+Nash equilibria of action-graph games. In Proceedings
+of the 20th Annual Conference on Uncertainty in
+Artificial Intelligence (UAI), Banff, Canada, 2004.
+[2] V. Conitzer and T. Sandholm. Complexity results
+about Nash equilibria. In Proceedings of the
+Eighteenth International Joint Conference on
+Artificial Intelligence (IJCAI), pages 765-771,
+Acapulco, Mexico, 2003.
+[3] V. Conitzer and T. Sandholm. Complexity of
+(iterated) dominance. In Proceedings of the ACM
+Conference on Electronic Commerce (ACM-EC),
+pages 88-97, Vancouver, Canada, 2005.
+[4] V. Conitzer and T. Sandholm. A generalized strategy
+eliminability criterion and computational methods for
+applying it. In Proceedings of the National Conference
+on Artificial Intelligence (AAAI), pages 483-488,
+Pittsburgh, PA, USA, 2005.
+[5] A. A. Cournot. Recherches sur les principes
+math´ematiques de la th´eorie des richesses (Researches
+1
+Bayesian games are one potentially concise representation
+of normal-form games.
+into the Mathematical Principles of the Theory of
+Wealth). Hachette, Paris, 1838.
+[6] G. Dantzig. A proof of the equivalence of the
+programming problem and the game problem. In
+T. Koopmans, editor, Activity Analysis of Production
+and Allocation, pages 330-335. John Wiley & Sons,
+1951.
+[7] I. Gilboa, E. Kalai, and E. Zemel. The complexity of
+eliminating dominated strategies. Mathematics of
+Operation Research, 18:553-565, 1993.
+[8] I. Gilboa and E. Zemel. Nash and correlated
+equilibria: Some complexity considerations. Games
+and Economic Behavior, 1:80-93, 1989.
+[9] R. Karp. Reducibility among combinatorial problems.
+In R. E. Miller and J. W. Thatcher, editors,
+Complexity of Computer Computations, pages 85-103.
+Plenum Press, NY, 1972.
+[10] M. Kearns, M. Littman, and S. Singh. Graphical
+models for game theory. In Proceedings of the
+Conference on Uncertainty in Artificial Intelligence
+(UAI), 2001.
+[11] D. E. Knuth, C. H. Papadimitriou, and J. N.
+Tsitsiklis. A note on strategy elimination in bimatrix
+games. Operations Research Letters, 7(3):103-107,
+1988.
+[12] D. Koller and N. Megiddo. The complexity of
+two-person zero-sum games in extensive form. Games
+and Economic Behavior, 4(4):528-552, Oct. 1992.
+[13] D. Koller, N. Megiddo, and B. von Stengel. Efficient
+computation of equilibria for extensive two-person
+games. Games and Economic Behavior, 14(2):247-259,
+1996.
+[14] K. Leyton-Brown and M. Tennenholtz. Local-effect
+games. In Proceedings of the Eighteenth International
+Joint Conference on Artificial Intelligence (IJCAI),
+Acapulco, Mexico, 2003.
+[15] R. Lipton, E. Markakis, and A. Mehta. Playing large
+games using simple strategies. In Proceedings of the
+ACM Conference on Electronic Commerce
+(ACM-EC), pages 36-41, San Diego, CA, 2003.
+[16] M. Littman and P. Stone. A polynomial-time Nash
+equilibrium algorithm for repeated games. In
+Proceedings of the ACM Conference on Electronic
+Commerce (ACM-EC), pages 48-54, San Diego, CA,
+2003.
+[17] R. D. Luce and H. Raiffa. Games and Decisions. John
+Wiley and Sons, New York, 1957. Dover republication
+1989.
+[18] J. Nash. Equilibrium points in n-person games. Proc.
+of the National Academy of Sciences, 36:48-49, 1950.
+[19] E. Nudelman, J. Wortman, K. Leyton-Brown, and
+Y. Shoham. Run the GAMUT: A comprehensive
+approach to evaluating game-theoretic algorithms. In
+International Conference on Autonomous Agents and
+Multi-Agent Systems (AAMAS), New York, NY, USA,
+2004.
+[20] M. J. Osborne and A. Rubinstein. A Course in Game
+Theory. MIT Press, 1994.
+[21] C. Papadimitriou. Algorithms, games and the
+Internet. In Proceedings of the Annual Symposium on
+Theory of Computing (STOC), pages 749-753, 2001.
+89
+[22] R. Porter, E. Nudelman, and Y. Shoham. Simple
+search methods for finding a Nash equilibrium. In
+Proceedings of the National Conference on Artificial
+Intelligence (AAAI), pages 664-669, San Jose, CA,
+USA, 2004.
+[23] T. Sandholm, A. Gilpin, and V. Conitzer.
+Mixed-integer programming methods for finding Nash
+equilibria. In Proceedings of the National Conference
+on Artificial Intelligence (AAAI), pages 495-501,
+Pittsburgh, PA, USA, 2005.
+[24] J. von Neumann. Zur Theorie der Gesellschaftsspiele.
+Mathematische Annalen, 100:295-320, 1927.
+[25] H. von Stackelberg. Marktform und Gleichgewicht.
+Springer, Vienna, 1934.
+[26] B. von Stengel and S. Zamir. Leadership with
+commitment to mixed strategies. CDAM Research
+Report LSE-CDAM-2004-01, London School of
+Economics, Feb. 2004.
+90

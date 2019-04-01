@@ -1,0 +1,1070 @@
+Negotiation by Abduction and Relaxation
+Chiaki Sakama
+Dept. Computer and Communication Sciences
+Wakayama University
+Sakaedani, Wakayama 640 8510, Japan
+sakama@sys.wakayama-u.ac.jp
+Katsumi Inoue
+National Institute of Informatics
+2-1-2 Hitotsubashi, Chiyoda-ku
+Tokyo 101 8430, Japan
+ki@nii.ac.jp
+ABSTRACT
+This paper studies a logical framework for automated 
+negotiation between two agents. We suppose an agent who has
+a knowledge base represented by a logic program. Then,
+we introduce methods of constructing counter-proposals in
+response to proposals made by an agent. To this end, we
+combine the techniques of extended abduction in artificial
+intelligence and relaxation in cooperative query answering
+for databases. These techniques are respectively used for
+producing conditional proposals and neighborhood proposals
+in the process of negotiation. We provide a negotiation 
+protocol based on the exchange of these proposals and develop
+procedures for computing new proposals.
+Categories and Subject Descriptors
+F.4.1 [Mathematical Logic]: Logic and constraint 
+programming;; I.2.11 [Distributed Artificial Intelligence]:
+Multiagent systems
+General Terms
+Theory
+1. INTRODUCTION
+Automated negotiation has been received increasing 
+attention in multi-agent systems, and a number of frameworks
+have been proposed in different contexts ([1, 2, 3, 5, 10, 11,
+13, 14], for instance). Negotiation usually proceeds in a 
+series of rounds and each agent makes a proposal at every
+round. An agent that received a proposal responds in two
+ways. One is a critique which is a remark as to whether
+or not (parts of) the proposal is accepted. The other is a
+counter-proposal which is an alternative proposal made in
+response to a previous proposal [13].
+To see these proposals in one-to-one negotiation, suppose
+the following negotiation dialogue between a buyer agent B
+and a seller agent S. (Bi (or Si) represents an utterance of
+B (or S) in the i-th round.)
+B1: I want to buy a personal computer of the brand b1,
+with the specification of CPU:1GHz, Memory:512MB,
+HDD: 80GB, and a DVD-RW driver. I want to get it
+at the price under 1200 USD.
+S1: We can provide a PC with the requested specification
+if you pay for it by cash. In this case, however, service
+points are not added for this special discount.
+B2: I cannot pay it by cash.
+S2: In a normal price, the requested PC costs 1300 USD.
+B3: I cannot accept the price. My budget is under 1200
+USD.
+S3: We can provide another computer with the requested
+specification, except that it is made by the brand b2.
+The price is exactly 1200 USD.
+B4: I do not want a PC of the brand b2. Instead, I can
+downgrade a driver from DVD-RW to CD-RW in my
+initial proposal.
+S4: Ok, I accept your offer.
+In this dialogue, in response to the opening proposal B1,
+the counter-proposal S1 is returned. In the rest of the 
+dialogue, B2, B3, S4 are critiques, while S2, S3, B4 are 
+counterproposals.
+Critiques are produced by evaluating a proposal in a 
+knowledge base of an agent. In contrast, making counter-proposals
+involves generating an alternative proposal which is more
+favorable to the responding agent than the original one.
+It is known that there are two ways of producing 
+counterproposals: extending the initial proposal or amending part
+of the initial proposal. According to [13], the first type 
+appears in the dialogue: A: I propose that you provide me
+with service X. B: I propose that I provide you with 
+service X if you provide me with service Z. The second type
+is in the dialogue: A: I propose that I provide you with
+service Y if you provide me with service X. B: I propose
+that I provide you with service X if you provide me with 
+service Z. A negotiation proceeds by iterating such 
+give-andtake dialogues until it reaches an agreement/disagreement.
+In those dialogues, agents generate (counter-)proposals by
+reasoning on their own goals or objectives. The objective
+of the agent A in the above dialogues is to obtain service
+X. The agent B proposes conditions to provide the 
+service. In the process of negotiation, however, it may happen
+that agents are obliged to weaken or change their initial
+goals to reach a negotiated compromise. In the dialogue of
+1022
+978-81-904262-7-5 (RPS) c 2007 IFAAMAS
+a buyer agent and a seller agent presented above, a buyer
+agent changes its initial goal by downgrading a driver from
+DVD-RW to CD-RW. Such behavior is usually represented
+as specific meta-knowledge of an agent or specified as 
+negotiation protocols in particular problems. Currently, there is
+no computational logic for automated negotiation which has
+general inference rules for producing (counter-)proposals.
+The purpose of this paper is to mechanize a process of
+building (counter-)proposals in one-to-one negotiation 
+dialogues. We suppose an agent who has a knowledge base
+represented by a logic program. We then introduce 
+methods for generating three different types of proposals. First,
+we use the technique of extended abduction in artificial 
+intelligence [8, 15] to construct a conditional proposal as an
+extension of the original one. Second, we use the technique
+of relaxation in cooperative query answering for databases
+[4, 6] to construct a neighborhood proposal as an amendment
+of the original one. Third, combining extended abduction
+and relaxation, conditional neighborhood proposals are 
+constructed as amended extensions of the original proposal. We
+develop a negotiation protocol between two agents based on
+the exchange of these counter-proposals and critiques. We
+also provide procedures for computing proposals in logic 
+programming.
+This paper is organized as follows. Section 2 introduces
+a logical framework used in this paper. Section 3 presents
+methods for constructing proposals, and provides a 
+negotiation protocol. Section 4 provides methods for computing
+proposals in logic programming. Section 5 discusses related
+works, and Section 6 concludes the paper.
+2. PRELIMINARIES
+Logic programs considered in this paper are extended 
+disjunctive programs (EDP) [7]. An EDP (or simply a program)
+is a set of rules of the form:
+L1 ; · · · ; Ll ← Ll+1 , . . . , Lm, not Lm+1 , . . . , not Ln
+(n ≥ m ≥ l ≥ 0) where each Li is a positive/negative 
+literal, i.e., A or ¬A for an atom A, and not is negation as
+failure (NAF). not L is called an NAF-literal. The symbol
+; represents disjunction. The left-hand side of the rule
+is the head, and the right-hand side is the body. For each
+rule r of the above form, head(r), body+
+(r) and body−
+(r)
+denote the sets of literals {L1, . . . , Ll}, {Ll+1, . . . , Lm}, and
+{Lm+1, . . . , Ln}, respectively. Also, not body−
+(r) denotes
+the set of NAF-literals {not Lm+1, . . . , not Ln}. A 
+disjunction of literals and a conjunction of (NAF-)literals in a rule
+are identified with its corresponding sets of literals. A rule
+r is often written as head(r) ← body+
+(r), not body−
+(r) or
+head(r) ← body(r) where body(r) = body+
+(r)∪not body−
+(r).
+A rule r is disjunctive if head(r) contains more than one 
+literal. A rule r is an integrity constraint if head(r) = ∅; and
+r is a fact if body(r) = ∅. A program is NAF-free if no
+rule contains NAF-literals. Two rules/literals are identified
+with respect to variable renaming. A substitution is a 
+mapping from variables to terms θ = {x1/t1, . . . , xn/tn}, where
+x1, . . . , xn are distinct variables and each ti is a term 
+distinct from xi. Given a conjunction G of (NAF-)literals, Gθ
+denotes the conjunction obtained by applying θ to G. A
+program, rule, or literal is ground if it contains no variable.
+A program P with variables is a shorthand of its ground
+instantiation Ground(P), the set of ground rules obtained
+from P by substituting variables in P by elements of its
+Herbrand universe in every possible way.
+The semantics of an EDP is defined by the answer set
+semantics [7]. Let Lit be the set of all ground literals in
+the language of a program. Suppose a program P and a
+set of literals S(⊆ Lit). Then, the reduct P S
+is the 
+program which contains the ground rule head(r) ← body+
+(r)
+iff there is a rule r in Ground(P) such that body−
+(r)∩S = ∅.
+Given an NAF-free EDP P, Cn(P) denotes the smallest set
+of ground literals which is (i) closed under P, i.e., for 
+every ground rule r in Ground(P), body(r) ⊆ Cn(P) implies
+head(r) ∩ Cn(P) = ∅; and (ii) logically closed, i.e., it is 
+either consistent or equal to Lit. Given an EDP P and a set
+S of literals, S is an answer set of P if S = Cn(P S
+). A
+program has none, one, or multiple answer sets in general.
+An answer set is consistent if it is not Lit. A program P is
+consistent if it has a consistent answer set; otherwise, P is
+inconsistent.
+Abductive logic programming [9] introduces a mechanism
+of hypothetical reasoning to logic programming. An 
+abductive framework used in this paper is the extended 
+abduction introduced by Inoue and Sakama [8, 15]. An abductive
+program is a pair P, H where P is an EDP and H is
+a set of literals called abducibles. When a literal L ∈ H
+contains variables, any instance of L is also an abducible.
+An abductive program P, H is consistent if P is 
+consistent. Throughout the paper, abductive programs are 
+assumed to be consistent unless stated otherwise. Let G =
+L1, . . . , Lm, not Lm+1, . . . , not Ln be a conjunction, where
+all variables in G are existentially quantified at the front and
+range-restricted, i.e., every variable in Lm+1, . . . , Ln appears
+in L1, . . . , Lm. A set S of ground literals satisfies the 
+conjunction G if { L1θ, . . . , Lmθ } ⊆ S and { Lm+1θ, . . . , Lnθ }∩
+S = ∅ for some ground instance Gθ with a substitution θ.
+Let P, H be an abductive program and G a conjunction
+as above. A pair (E, F) is an explanation of an observation
+G in P, H if1
+1. (P \ F) ∪ E has an answer set which satisfies G,
+2. (P \ F) ∪ E is consistent,
+3. E and F are sets of ground literals such that E ⊆ H\P
+and F ⊆ H ∩ P.
+When (P \ F) ∪ E has an answer set S satisfying the above
+three conditions, S is called a belief set of an abductive 
+program P, H satisfying G (with respect to (E, F)). Note
+that if P has a consistent answer set S satisfying G, S
+is also a belief set of P, H satisfying G with respect to
+(E, F) = (∅, ∅). Extended abduction introduces/removes
+hypotheses to/from a program to explain an observation.
+Note that normal abduction (as in [9]) considers only 
+introducing hypotheses to explain an observation. An 
+explanation (E, F) of an observation G is called minimal if for
+any explanation (E , F ) of G, E ⊆ E and F ⊆ F imply
+E = E and F = F.
+Example 2.1. Consider the abductive program P, H :
+P : flies(x) ← bird(x), not ab(x) ,
+ab(x) ← broken-wing(x) ,
+bird(tweety) ← , bird(opus) ← ,
+broken-wing(tweety) ← .
+H : broken-wing(x) .
+The observation G = flies(tweety) has the minimal 
+explanation (E, F) = (∅, {broken-wing(tweety)}).
+1
+This defines credulous explanations [15]. Skeptical 
+explanations are used in [8].
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 1023
+3. NEGOTIATION
+3.1 Conditional Proposals by Abduction
+We suppose an agent who has a knowledge base 
+represented by an abductive program P, H . A program P
+consists of two types of knowledge, belief B and desire D,
+where B represents objective knowledge of an agent, while
+D represents subjective knowledge in general. We define
+P = B ∪ D, but do not distinguish B and D if such 
+distinction is not important in the context. In contrast, abducibles
+H are used for representing permissible conditions to make
+a compromise in the process of negotiation.
+Definition 3.1. A proposal G is a conjunction of literals
+and NAF-literals:
+L1, . . . , Lm, not Lm+1, . . . , not Ln
+where every variable in G is existentially quantified at the
+front and range-restricted. In particular, G is called a 
+critique if G = accept or G = reject where accept and reject
+are the reserved propositions. A counter-proposal is a 
+proposal made in response to a proposal.
+Definition 3.2. A proposal G is accepted in an 
+abductive program P, H if P has an answer set satisfying G.
+When a proposal is not accepted, abduction is used for
+seeking conditions to make it acceptable.
+Definition 3.3. Let P, H be an abductive program
+and G a proposal. If (E, F) is a minimal explanation of
+Gθ for some substitution θ in P, H , the conjunction G :
+Gθ, E, not F
+is called a conditional proposal (for G), where E, not F
+represents the conjunction: A1, . . . , Ak, not Ak+1, . . . , not Al
+for E = {A1, . . . , Ak} and F = { Ak+1, . . . , Al }.
+Proposition 3.1. Let P, H be an abductive program
+and G a proposal. If G is a conditional proposal, there is a
+belief set S of P, H satisfying G .
+Proof. When G = Gθ, E, not F, (P \ F) ∪ E has a
+consistent answer set S satisfying Gθ and E ∩ F = ∅. In
+this case, S satisfies Gθ, E, not F.
+A conditional proposal G provides a minimal requirement
+for accepting the proposal G. If Gθ has multiple minimal 
+explanations, several conditional proposals exist accordingly.
+When (E, F) = (∅, ∅), a conditional proposal is used as a
+new proposal made in response to the proposal G.
+Example 3.1. An agent seeks a position of a research
+assistant at the computer department of a university with
+the condition that the salary is at least 50,000 USD per year.
+The agent makes his/her request as the proposal:2
+G = assist(compt dept), salary(x), x ≥ 50, 000.
+The university has the abductive program P, H :
+P : salary(40, 000) ← assist(compt dept), not has PhD,
+salary(60, 000) ← assist(compt dept), has PhD,
+salary(50, 000) ← assist(math dept),
+salary(55, 000) ← system admin(compt dept),
+2
+For notational convenience, we often include mathematical
+(in)equations in proposals/programs. They are written by
+literals, for instance, x ≥ y by geq(x, y) with a suitable
+definition of the predicate geq.
+employee(x) ← assist(x),
+employee(x) ← system admin(x),
+assist(compt dept); assist(math dept)
+; system admin(compt dept) ←,
+H : has PhD,
+where available positions are represented by disjunction. 
+According to P, the base salary of a research assistant at the
+computer department is 40,000 USD, but if he/she has PhD,
+it is 60,000 USD. In this case, (E, F) = ({has PhD}, ∅) 
+becomes the minimal explanation of Gθ = assist(compt dept),
+salary(60, 000) with θ = { x/60, 000 }. Then, the 
+conditional proposal made by the university becomes
+assist(compt dept), salary(60, 000), has PhD .
+3.2 Neighborhood Proposals by Relaxation
+When a proposal is unacceptable, an agent tries to 
+construct a new counter-proposal by weakening constraints in
+the initial proposal. We use techniques of relaxation for
+this purpose. Relaxation is used as a technique of 
+cooperative query answering in databases [4, 6]. When an original
+query fails in a database, relaxation expands the scope of
+the query by relaxing the constraints in the query. This 
+allows the database to return neighborhood answers which
+are related to the original query. We use the technique for
+producing proposals in the process of negotiation.
+Definition 3.4. Let P, H be an abductive program
+and G a proposal. Then, G is relaxed to G in the following
+three ways:
+Anti-instantiation: Construct G such that G θ = G for
+some substitution θ.
+Dropping conditions: Construct G such that G ⊂ G.
+Goal replacement: If G is a conjunction G1, G2, where
+G1 and G2 are conjunctions, and there is a rule L ←
+G1 in P such that G1θ = G1 for some substitution θ,
+then build G as Lθ, G2. Here, Lθ is called a replaced
+literal.
+In each case, every variable in G is existentially quantified
+at the front and range-restricted.
+Anti-instantiation replaces constants (or terms) with fresh
+variables. Dropping conditions eliminates some conditions
+in a proposal. Goal replacement replaces the condition G1
+in G with a literal Lθ in the presence of a rule L ← G1 in P
+under the condition G1θ = G1. All these operations 
+generalize proposals in different ways. Each G obtained by these
+operations is called a relaxation of G. It is worth noting
+that these operations are also used in the context of 
+inductive generalization [12]. The relaxed proposal can produce
+new offers which are neighbor to the original proposal.
+Definition 3.5. Let P, H be an abductive program
+and G a proposal.
+1. Let G be a proposal obtained by anti-instantiation. If
+P has an answer set S which satisfies G θ for some 
+substitution θ and G θ = G, G θ is called a neighborhood
+proposal by anti-instantiation.
+2. Let G be a proposal obtained by dropping conditions.
+If P has an answer set S which satisfies G θ for some
+substitution θ, G θ is called a neighborhood proposal by
+dropping conditions.
+1024 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+3. Let G be a proposal obtained by goal replacement.
+For a replaced literal L ∈ G and a rule H ← B in
+P such that L = Hσ and (G \ {L}) ∪ Bσ = G for
+some substitution σ, put G = (G \ {L}) ∪ Bσ. If
+P has an answer set S which satisfies G θ for some
+substitution θ, G θ is called a neighborhood proposal
+by goal replacement.
+Example 3.2. (cont. Example 3.1) Given the proposal
+G = assist(compt dept), salary(x), x ≥ 50, 000,
+• G1 = assist(w), salary(x), x ≥ 50, 000 is produced by
+substituting compt dept with a variable w. As
+G1θ1 = assist(math dept), salary(50, 000)
+with θ1 = { w/math dept } is satisfied by an answer
+set of P, G1θ1 becomes a neighborhood proposal by
+anti-instantiation.
+• G2 = assist(compt dept), salary(x) is produced by
+dropping the salary condition x ≥ 50, 000. As
+G2θ2 = assist(compt dept), salary(40, 000)
+with θ2 = { x/40, 000 } is satisfied by an answer set of
+P, G2θ2 becomes a neighborhood proposal by 
+dropping conditions.
+• G3 = employee(compt dept), salary(x), x ≥ 50, 000 is
+produced by replacing assist(compt dept) with
+employee(compt dept) using the rule employee(x) ←
+assist(x) in P. By G3 and the rule employee(x) ←
+system admin(x) in P, G3 = sys admin(compt dept),
+salary(x), x ≥ 50, 000 is produced. As
+G3 θ3 = sys admin(compt dept), salary(55, 000)
+with θ3 = { x/55, 000 } is satisfied by an answer set
+of P, G3 θ3 becomes a neighborhood proposal by goal
+replacement.
+Finally, extended abduction and relaxation are combined to
+produce conditional neighborhood proposals.
+Definition 3.6. Let P, H be an abductive program
+and G a proposal.
+1. Let G be a proposal obtained by either anti-instantiation
+or dropping conditions. If (E, F) is a minimal 
+explanation of G θ(= G) for some substitution θ, the 
+conjunction G θ, E, not F is called a conditional neighborhood
+proposal by anti-instantiation/dropping conditions.
+2. Let G be a proposal obtained by goal replacement.
+Suppose G as in Definition 3.5(3). If (E, F) is a
+minimal explanation of G θ for some substitution θ,
+the conjunction G θ, E, not F is called a conditional
+neighborhood proposal by goal replacement.
+A conditional neighborhood proposal reduces to a 
+neighborhood proposal when (E, F) = (∅, ∅).
+3.3 Negotiation Protocol
+A negotiation protocol defines how to exchange proposals
+in the process of negotiation. This section presents a 
+negotiation protocol in our framework. We suppose one-to-one
+negotiation between two agents who have a common 
+ontology and the same language for successful communication.
+Definition 3.7. A proposal L1, ..., Lm, not Lm+1, ..., not Ln
+violates an integrity constraint ← body+
+(r), not body−
+(r) if
+for any substitution θ, there is a substitution σ such that
+body+
+(r)σ ⊆ { L1θ, . . . , Lmθ }, body−
+(r)σ∩{ L1θ, . . . , Lmθ } =
+∅, and body−
+(r)σ ⊆ { Lm+1θ, . . . , Lnθ }.
+Integrity constraints are conditions which an agent should
+satisfy, so that they are used to explain why an agent does
+not accept a proposal.
+A negotiation proceeds in a series of rounds. Each i-th
+round (i ≥ 1) consists of a proposal Gi
+1 made by one agent
+Ag1 and another proposal Gi
+2 made by the other agent Ag2.
+Definition 3.8. Let P1, H1 be an abductive program
+of an agent Ag1 and Gi
+2 a proposal made by Ag2 at the i-th
+round. A critique set of Ag1 (at the i-th round) is a set
+CSi
+1(P1, Gj
+2) = CSi−1
+1 (P1, Gj−1
+2 ) ∪ { r | r is an integrity
+constraint in P1 and Gj
+2 violates r }
+where j = i − 1 or i, and CS0
+1 (P1, G0
+2) = CS1
+1 (P1, G0
+2) = ∅.
+A critique set of an agent Ag1 accumulates integrity 
+constraints which are violated by proposals made by another
+agent Ag2. CSi
+2(P2, Gj
+1) is defined in the same manner.
+Definition 3.9. Let Pk, Hk be an abductive program
+of an agent Agk and Gj
+a proposal, which is not a critique,
+made by any agent at the j(≤ i)-th round. A negotiation set
+of Agk (at the i-th round) is a triple NSi
+k = (Si
+c, Si
+n, Si
+cn),
+where Si
+c is the set of conditional proposals, Si
+n is the set
+of neighborhood proposals, and Si
+cn is the set of conditional
+neighborhood proposals, produced by Gj
+and Pk, Hk .
+A negotiation set represents the space of possible proposals
+made by an agent. Si
+x (x ∈ {c, n, cn}) accumulates proposals
+produced by Gj
+(1 ≤ j ≤ i) according to Definitions 3.3, 3.5,
+and 3.6. Note that an agent can construct counter-proposals
+by modifying its own previous proposals or another agent"s
+proposals. An agent Agk accumulates proposals that are
+made by Agk but are rejected by another agent, in the failed
+proposal set FP i
+k (at the i-th round), where FP 0
+k = ∅.
+Suppose two agents Ag1 and Ag2 who have abductive 
+programs P1, H1 and P2, H2 , respectively. Given a 
+proposal G1
+1 which is satisfied by an answer set of P1, a 
+negotiation starts. In response to the proposal Gi
+1 made by Ag1
+at the i-th round, Ag2 behaves as follows.
+1. If Gi
+1 = accept, an agreement is reached and 
+negotiation ends in success.
+2. Else if Gi
+1 = reject, put FP i
+2 = FPi−1
+2 ∪{Gi−1
+2 } where
+{G0
+2} = ∅. Proceed to the step 4(b).
+3. Else if P2 has an answer set satisfying Gi
+1, Ag2 returns
+Gi
+2 = accept to Ag1. Negotiation ends in success.
+4. Otherwise, Ag2 behaves as follows. Put FP i
+2 = FPi−1
+2 .
+(a) If Gi
+1 violates an integrity constraint in P2, return
+the critique Gi
+2 = reject to Ag1, together with the
+critique set CSi
+2(P2, Gi
+1).
+(b) Otherwise, construct NSi
+2 as follows.
+(i) Produce Si
+c. Let μ(Si
+c) = { p | p ∈ Si
+c \ FPi
+2 and
+p satisfies the constraints in CSi
+1(P1, Gi−1
+2 )}.
+If μ(Si
+c) = ∅, select one from μ(Si
+c) and propose
+it as Gi
+2 to Ag1; otherwise, go to (ii).
+(ii) Produce Si
+n. If μ(Si
+n) = ∅, select one from μ(Si
+n)
+and propose it as Gi
+2 to Ag1; otherwise, go to (iii).
+(iii) Produce Si
+cn. If μ(Si
+cn) = ∅, select one from
+μ(Si
+cn) and propose it as Gi
+2 to Ag1; otherwise,
+negotiation ends in failure. This means that Ag2
+can make no counter-proposal or every 
+counterproposal made by Ag2 is rejected by Ag1.
+In the step 4(a), Ag2 rejects the proposal Gi
+1 and returns
+the reason of rejection as a critique set. This helps for Ag1
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 1025
+in preparing a next counter-proposal. In the step 4(b), Ag2
+constructs a new proposal. In its construction, Ag2 should
+take care of the critique set CSi
+1(P1, Gi−1
+2 ), which 
+represents integrity constraints, if any, accumulated in previous
+rounds, that Ag1 must satisfy. Also, FP i
+2 is used for 
+removing proposals which have been rejected. Construction of
+Si
+x (x ∈ {c, n, cn}) in NSi
+2 is incrementally done by adding
+new counter-proposals produced by Gi
+1 or Gi−1
+2 to Si−1
+x . For
+instance, Si
+n in NSi
+2 is computed as
+Si
+n = Si−1
+n ∪{ p | p is a neighborhood proposal made by Gi
+1 }
+∪ { p | p is a neighborhood proposal made by Gi−1
+2 },
+where S0
+n = ∅. That is, Si
+n is constructed from Si−1
+n by
+adding new proposals which are obtained by modifying the
+proposal Gi
+1 made by Ag1 at the i-th round or modifying
+the proposal Gi−1
+2 made by Ag2 at the (i − 1)-th round. Si
+c
+and Si
+cn are obtained as well.
+In the above protocol, an agent produces Si
+c at first, 
+secondly Si
+n, and finally Si
+cn. This strategy seeks conditions
+which satisfy the given proposal, prior to neighborhood 
+proposals which change the original one. Another strategy,
+which prefers neighborhood proposals to conditional ones,
+is also considered. Conditional neighborhood proposals are
+to be considered in the last place, since they differ from the
+original one to the maximal extent. The above protocol 
+produces the candidate proposals in Si
+x for each x ∈ {c, n, cn}
+at once. We can consider a variant of the protocol in which
+each proposal in Si
+x is constructed one by one (see 
+Example 3.3).
+The above protocol is repeatedly applied to each one of
+the two negotiating agents until a negotiation ends in 
+success/failure. Formally, the above negotiation protocol has
+the following properties.
+Theorem 3.2. Let Ag1 and Ag2 be two agents having 
+abductive programs P1, H1 and P2, H2 , respectively.
+1. If P1, H1 and P2, H2 are function-free (i.e., both
+Pi and Hi contain no function symbol), any 
+negotiation will terminate.
+2. If a negotiation terminates with agreement on a 
+proposal G, both P1, H1 and P2, H2 have belief sets
+satisfying G.
+Proof. 1. When an abductive program is function-free,
+abducibles and negotiation sets are both finite. Moreover, if
+a proposal is once rejected, it is not proposed again by the
+function μ. Thus, negotiation will terminate in finite steps.
+2. When a proposal G is made by Ag1, P1, H1 has a
+belief set satisfying G. If the agent Ag2 accepts the proposal
+G, it is satisfied by an answer set of P2 which is also a belief
+set of P2, H2 .
+Example 3.3. Suppose a buying-selling situation in the
+introduction. A seller agent has the abductive program
+Ps, Hs in which Ps consists of belief Bs and desire Ds:
+Bs : pc(b1, 1G, 512M, 80G) ; pc(b2, 1G, 512M, 80G) ←,(1)
+dvd-rw ; cd-rw ←, (2)
+Ds : normal price(1300) ←
+pc(b1, 1G, 512M, 80G), dvd-rw, (3)
+normal price(1200) ←
+pc(b1, 1G, 512M, 80G), cd-rw, (4)
+normal price(1200) ←
+pc(b2, 1G, 512M, 80G), dvd-rw, (5)
+price(x) ← normal price(x), add point, (6)
+price(x ∗ 0.9) ←
+normal price(x), pay cash, not add point,(7)
+add point ←, (8)
+Hs : add point, pay cash.
+Here, (1) and (2) represent selection of products. The atom
+pc(b1, 1G, 512M, 80G) represents that the seller agent has
+a PC of the brand b1 such that CPU is 1GHz, memory is
+512MB, and HDD is 80GB. Prices of products are 
+represented as desire of the seller. The rules (3) - (5) are normal
+prices of products. A normal price is a selling price on the
+condition that service points are added (6). On the other
+hand, a discount price is applied if the paying method is cash
+and no service point is added (7). The fact (8) represents
+the addition of service points. This service would be 
+withdrawn in case of discount prices, so add point is specified as
+an abducible.
+A buyer agent has the abductive program Pb, Hb in
+which Pb consists of belief Bb and desire Db:
+Bb : drive ← dvd-rw, (9)
+drive ← cd-rw, (10)
+price(x) ←, (11)
+Db : pc(b1, 1G, 512M, 80G) ←, (12)
+dvd-rw ←, (13)
+cd-rw ← not dvd-rw, (14)
+← pay cash, (15)
+← price(x), x > 1200, (16)
+Hb : dvd-rw.
+Rules (12) - (16) are the buyer"s desire. Among them, (15)
+and (16) impose constraints for buying a PC. A DVD-RW
+is specified as an abducible which is subject to concession.
+(1st round) First, the following proposal is given by the
+buyer agent:
+G1
+b : pc(b1, 1G, 512M, 80G), dvd-rw, price(x), x ≤ 1200.
+As Ps has no answer set which satisfies G1
+b , the seller agent
+cannot accept the proposal. The seller takes an action of
+making a counter-proposal and performs abduction. As a
+result, the seller finds the minimal explanation (E, F) =
+({ pay cash }, { add point }) which explains G1
+b θ1 with θ1 =
+{ x/1170 }. The seller constructs the conditional proposal:
+G1
+s : pc(b1, 1G, 512M, 80G), dvd-rw, price(1170),
+pay cash, not add point
+and offers it to the buyer.
+(2nd round) The buyer does not accept G1
+s because he/she
+cannot pay it by cash (15). The buyer then returns the 
+critique G2
+b = reject to the seller, together with the critique set
+CS2
+b (Pb, G1
+s) = {(15)}. In response to this, the seller tries
+to make another proposal which satisfies the constraint in
+this critique set. As G1
+s is stored in FP 2
+s and no other 
+conditional proposal satisfying the buyer"s requirement exists,
+the seller produces neighborhood proposals. He/she relaxes
+G1
+b by dropping x ≤ 1200 in the condition, and produces
+pc(b1, 1G, 512M, 80G), dvd-rw, price(x).
+As Ps has an answer set which satisfies
+G2
+s : pc(b1, 1G, 512M, 80G), dvd-rw, price(1300),
+1026 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+the seller offers G2
+s as a new counter-proposal.
+(3rd round) The buyer does not accept G2
+s because he/she
+cannot pay more than 1200USD (16). The buyer again 
+returns the critique G3
+b = reject to the seller, together with
+the critique set CS3
+b (Pb, G2
+s) = CS2
+b (Pb, G1
+s) ∪ {(16)}. The
+seller then considers another proposal by replacing b1 with
+a variable w, G1
+b now becomes
+pc(w, 1G, 512M, 80G), dvd-rw, price(x), x ≤ 1200.
+As Ps has an answer set which satisfies
+G3
+s : pc(b2, 1G, 512M, 80G), dvd-rw, price(1200),
+the seller offers G3
+s as a new counter-proposal.
+(4th round) The buyer does not accept G3
+s because a PC of
+the brand b2 is out of his/her interest and Pb has no answer
+set satisfying G3
+s. Then, the buyer makes a concession by
+changing his/her original goal. The buyer relaxes G1
+b by goal
+replacement using the rule (9) in Pb, and produces
+pc(b1, 1G, 512M, 80G), drive, price(x), x ≤ 1200.
+Using (10), the following proposal is produced:
+pc(b1, 1G, 512M, 80G), cd-rw, price(x), x ≤ 1200.
+As Pb \ { dvd-rw } has a consistent answer set satisfying the
+above proposal, the buyer proposes the conditional 
+neighborhood proposal
+G4
+b : pc(b1, 1G, 512M, 80G), cd-rw, not dvd-rw,
+price(x), x ≤ 1200
+to the seller agent. Since Ps also has an answer set satisfying
+G4
+b , the seller accepts it and sends the message G4
+s = accept
+to the buyer. Thus, the negotiation ends in success.
+4. COMPUTATION
+In this section, we provide methods of computing 
+proposals in terms of answer sets of programs. We first introduce
+some definitions from [15].
+Definition 4.1. Given an abductive program P, H , the
+set UR of update rules is defined as:
+UR = { L ← not L, L ← not L | L ∈ H }
+∪ { +L ← L | L ∈ H \ P }
+∪ { −L ← not L | L ∈ H ∩ P } ,
+where L, +L, and −L are new atoms uniquely associated
+with every L ∈ H. The atoms +L and −L are called update
+atoms.
+By the definition, the atom L becomes true iff L is not
+true. The pair of rules L ← not L and L ← not L specify
+the situation that an abducible L is true or not. When
+p(x) ∈ H and p(a) ∈ P but p(t) ∈ P for t = a, the rule
++L ← L precisely becomes +p(t) ← p(t) for any t = a. In
+this case, the rule is shortly written as +p(x) ← p(x), x = a.
+Generally, the rule becomes +p(x) ← p(x), x = t1, . . . , x =
+tn for n such instances. The rule +L ← L derives the atom
++L if an abducible L which is not in P is to be true. In
+contrast, the rule −L ← not L derives the atom −L if an
+abducible L which is in P is not to be true. Thus, update
+atoms represent the change of truth values of abducibles in
+a program. That is, +L means the introduction of L, while
+−L means the deletion of L. When an abducible L contains
+variables, the associated update atom +L or −L is supposed
+to have exactly the same variables. In this case, an update
+atom is semantically identified with its ground instances.
+The set of all update atoms associated with the abducibles
+in H is denoted by UH, and UH = UH+
+∪ UH−
+where
+UH+
+(resp. UH−
+) is the set of update atoms of the form
++L (resp. −L).
+Definition 4.2. Given an abductive program P, H , its
+update program UP is defined as the program
+UP = (P \ H) ∪ UR .
+An answer set S of UP is called U-minimal if there is no
+answer set T of UP such that T ∩ UH ⊂ S ∩ UH.
+By the definition, U-minimal answer sets exist whenever
+UP has answer sets. Update programs are used for 
+computing (minimal) explanations of an observation. Given an
+observation G as a conjunction of literals and NAF-literals
+possibly containing variables, we introduce a new ground
+literal O together with the rule O ← G. In this case, O
+has an explanation (E, F) iff G has the same explanation.
+With this replacement, an observation is assumed to be a
+ground literal without loss of generality. In what follows,
+E+
+= { +L | L ∈ E } and F −
+= { −L | L ∈ F } for E ⊆ H
+and F ⊆ H.
+Proposition 4.1. ([15]) Let P, H be an abductive 
+program, UP its update program, and G a ground literal 
+representing an observation. Then, a pair (E, F) is an 
+explanation of G iff UP ∪ { ← not G } has a consistent answer set
+S such that E+
+= S ∩ UH+
+and F−
+= S ∩ UH−
+. In 
+particular, (E, F) is a minimal explanation iff S is a U-minimal
+answer set.
+Example 4.1. To explain the observation G = flies(t)
+in the program P of Example 2.1, first construct the update
+program UP of P:3
+UP : flies(x) ← bird(x), not ab(x),
+ab(x) ← broken-wing(x) ,
+bird(t) ← , bird(o) ← ,
+broken-wing(x) ← not broken-wing(x),
+broken-wing(x) ← not broken-wing(x),
++broken-wing(x) ← broken-wing(x), x = t ,
+−broken-wing(t) ← not broken-wing(t) .
+Next, consider the program UP ∪ { ← not flies(t) }. It has
+the single U-minimal answer set: S = { bird(t), bird(o), flies(t),
+flies(o), broken-wing(t), broken-wing(o), −broken-wing(t) }.
+The unique minimal explanation (E, F) = (∅, {broken-wing(t)})
+of G is expressed by the update atom −broken-wing(t) in
+S ∩ UH−
+.
+Proposition 4.2. Let P, H be an abductive program
+and G a ground literal representing an observation. If P ∪
+{ ← not G } has a consistent answer set S, G has the 
+minimal explanation (E, F) = (∅, ∅) and S satisfies G.
+Now we provide methods for computing (counter-)proposals.
+First, conditional proposals are computed as follows.
+input : an abductive program P, H , a proposal G;
+output : a set Sc of proposals.
+If G is a ground literal, compute its minimal 
+explanation (E, F) in P, H using the update program. Put
+G, E, not F in Sc. Else if G is a conjunction possibly
+containing variables, consider the abductive program
+3
+t represents tweety and o represents opus.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 1027
+P ∪{ O ← G }, H with a ground literal O. Compute
+a minimal explanation of O in P ∪ { O ← G }, H
+using its update program. If O has a minimal 
+explanation (E, F) with a substitution θ for variables in G,
+put Gθ, E, not F in Sc.
+Next, neighborhood proposals are computed as follows.
+input : an abductive program P, H , a proposal G;
+output : a set Sn of proposals.
+% neighborhood proposals by anti-instantiation;
+Construct G by anti-instantiation. For a ground 
+literal O, if P ∪ { O ← G } ∪ { ← not O } has a 
+consistent answer set satisfying G θ with a substitution θ
+and G θ = G, put G θ in Sn.
+% neighborhood proposals by dropping conditions;
+Construct G by dropping conditions. If G is a ground
+literal and the program P ∪ { ← not G } has a 
+consistent answer set, put G in Sn. Else if G is a 
+conjunction possibly containing variables, do the following.
+For a ground literal O, if P ∪{ O ← G }∪{ ← not O }
+has a consistent answer set satisfying G θ with a 
+substitution θ, put G θ in Sn.
+% neighborhood proposals by goal replacement;
+Construct G by goal replacement. If G is a ground 
+literal and there is a rule H ← B in P such that G = Hσ
+and Bσ = G for some substitution σ, put G = Bσ.
+If P ∪ { ← not G } has a consistent answer set 
+satisfying G θ with a substitution θ, put G θ in Sn. Else
+if G is a conjunction possibly containing variables,
+do the following. For a replaced literal L ∈ G , if
+there is a rule H ← B in P such that L = Hσ and
+(G \ {L}) ∪ Bσ = G for some substitution σ, put
+G = (G \ {L}) ∪ Bσ. For a ground literal O, if
+P ∪ { O ← G } ∪ { ← not O } has a consistent answer
+set satisfying G θ with a substitution θ, put G θ in
+Sn.
+Theorem 4.3. The set Sc (resp. Sn) computed above 
+coincides with the set of conditional proposals (resp. 
+neighborhood proposals).
+Proof. The result for Sc follows from Definition 3.3 and
+Proposition 4.1. The result for Sn follows from Definition 3.5
+and Proposition 4.2.
+Conditional neighborhood proposals are computed by 
+combining the above two procedures. Those proposals are 
+computed at each round. Note that the procedure for computing
+Sn contains some nondeterministic choices. For instance,
+there are generally several candidates of literals to relax in
+a proposal. Also, there might be several rules in a program
+for the usage of goal replacement. In practice, an agent can
+prespecify literals in a proposal for possible relaxation or
+rules in a program for the usage of goal replacement.
+5. RELATED WORK
+As there are a number of literature on automated 
+negotiation, this section focuses on comparison with negotiation
+frameworks based on logic and argumentation.
+Sadri et al. [14] use abductive logic programming as a 
+representation language of negotiating agents. Agents negotiate
+using common dialogue primitives, called dialogue moves.
+Each agent has an abductive logic program in which a 
+sequence of dialogues are specified by a program, a dialogue
+protocol is specified as constraints, and dialogue moves are
+specified as abducibles. The behavior of agents is regulated
+by an observe-think-act cycle. Once a dialogue move is 
+uttered by an agent, another agent that observed the utterance
+thinks and acts using a proof procedure. Their approach
+and ours both employ abductive logic programming as a
+platform of agent reasoning, but the use of it is quite 
+different. First, they use abducibles to specify dialogue primitives
+of the form tell(utterer, receiver, subject, identifier, time),
+while we use abducibles to specify arbitrary permissible 
+hypotheses to construct conditional proposals. Second, a 
+program pre-specifies a plan to carry out in order to achieve a
+goal, together with available/missing resources in the 
+context of resource-exchanging problems. This is in contrast
+with our method in which possible counter-proposals are
+newly constructed in response to a proposal made by an
+agent. Third, they specify a negotiation policy inside a
+program (as integrity constraints), while we give a protocol
+independent of individual agents. They provide an 
+operational model that completely specifies the behavior of agents
+in terms of agent cycle. We do not provide such a complete
+specification of the behavior of agents. Our primary interest
+is to mechanize construction of proposals.
+Bracciali and Torroni [2] formulate abductive agents that
+have knowledge in abductive logic programs. To explain
+an observation, two agents communicate by exchanging 
+integrity constraints. In the process of communication, an
+agent can revise its own integrity constraints according to
+the information provided by the other agent. A set IC
+of integrity constraints relaxes a set IC (or IC tightens
+IC ) if any observation that can be proved with respect to
+IC can also be proved with respect to IC . For instance,
+IC : ← a, b, c relaxes IC : ← a, b. Thus, they use relaxation
+for weakening the constraints in an abductive logic program.
+In contrast, we use relaxation for weakening proposals and
+three different relaxation methods, anti-instantiation, 
+dropping conditions, and goal replacement, are considered. Their
+goal is to explain an observation by revising integrity 
+constraints of an agent through communication, while we use
+integrity constraints for communication to explain critiques
+and help other agents in making counter-proposals.
+Meyer et al. [11] introduce a logical framework for 
+negotiating agents. They introduce two different modes of 
+negotiation: concession and adaptation. They provide rational
+postulates to characterize negotiated outcomes between two
+agents, and describe methods for constructing outcomes.
+They provide logical conditions for negotiated outcomes to
+satisfy, but they do not describe a process of negotiation nor
+negotiation protocols. Moreover, they represent agents by
+classical propositional theories, which is different from our
+abductive logic programming framework.
+Foo et al. [5] model one-to-one negotiation as a one-time
+encounter between two extended logic programs. An agent
+offers an answer set of its program, and their mutual deal is
+regarded as a trade on their answer sets. Starting from the
+initial agreement set S∩T for an answer set S of an agent and
+an answer set T of another agent, each agent extends this
+set to reflect its own demand while keeping consistency with
+demand of the other agent. Their algorithm returns new
+programs having answer sets which are consistent with each
+other and keep the agreement set. The work is extended to
+repeated encounters in [3]. In their framework, two agents
+exchange answer sets to produce a common belief set, which
+is different from our framework of exchanging proposals.
+There are a number of proposals for negotiation based
+1028 The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07)
+on argumentation. An advantage of argumentation-based
+negotiation is that it constructs a proposal with arguments
+supporting the proposal [1]. The existence of arguments is
+useful to convince other agents of reasons why an agent offers
+(counter-)proposals or returns critiques. Parsons et al. [13]
+develop a logic of argumentation-based negotiation among
+BDI agents. In one-to-one negotiation, an agent A generates
+a proposal together with its arguments, and passes it to
+another agent B. The proposal is evaluated by B which
+attempts to build arguments against it. If it conflicts with
+B"s interest, B informs A of its objection by sending back
+its attacking argument. In response to this, A tries to find
+an alternative way of achieving its original objective, or a
+way of persuading B to drop its objection. If either type of
+argument can be found, A will submit it to B. If B finds no
+reason to reject the new proposal, it will be accepted and
+the negotiation ends in success. Otherwise, the process is
+iterated. In this negotiation processes, the agent A never
+changes its original objective, so that negotiation ends in
+failure if A fails to find an alternative way of achieving the
+original objective. In our framework, when a proposal is
+rejected by another agent, an agent can weaken or change
+its objective by abduction and relaxation. Our framework
+does not have a mechanism of argumentation, but reasons
+for critiques can be informed by responding critique sets.
+Kakas and Moraitis [10] propose a negotiation protocol
+which integrates abduction within an argumentation 
+framework. A proposal contains an offer corresponding to the 
+negotiation object, together with supporting information 
+representing conditions under which this offer is made. 
+Supporting information is computed by abduction and is used
+for constructing conditional arguments during the process
+of negotiation. In their negotiation protocol, when an agent
+cannot satisfy its own goal, the agent considers the other
+agent"s goal and searches for conditions under which the
+goal is acceptable. Our present approach differs from theirs
+in the following points. First, they use abduction to seek
+conditions to support arguments, while we use abduction
+to seek conditions for proposals to accept. Second, in their
+negotiation protocol, counter-proposals are chosen among
+candidates based on preference knowledge of an agent at
+meta-level, which represents policy under which an agent
+uses its object-level decision rules according to situations.
+In our framework, counter-proposals are newly constructed
+using abduction and relaxation. The method of 
+construction is independent of particular negotiation protocols. As
+[2, 10, 14], abduction or abductive logic programming used
+in negotiation is mostly based on normal abduction. In 
+contrast, our approach is based on extended abduction which
+can not only introduce hypotheses but remove them from a
+program. This is another important difference.
+Relaxation and neighborhood query answering are devised
+to make databases cooperative with their users [4, 6]. In this
+sense, those techniques have the spirit similar to cooperative
+problem solving in multi-agent systems. As far as the 
+authors know, however, there is no study which applies those
+technique to agent negotiation.
+6. CONCLUSION
+In this paper we proposed a logical framework for 
+negotiating agents. To construct proposals in the process of 
+negotiation, we combined the techniques of extended abduction
+and relaxation. It was shown that these two operations are
+used for general inference rules in producing proposals. We
+developed a negotiation protocol between two agents based
+on exchange of proposals and critiques, and provided 
+procedures for computing proposals in abductive logic 
+programming. This enables us to realize automated negotiation on
+top of the existing answer set solvers. The present 
+framework does not have a mechanism of selecting an optimal
+(counter-)proposal among different alternatives. To 
+compare and evaluate proposals, an agent must have preference
+knowledge of candidate proposals. Further elaboration to
+maximize the utility of agents is left for future study.
+7. REFERENCES
+[1] L. Amgoud, S. Parsons, and N. Maudet. Arguments,
+dialogue, and negotiation. In: Proc. ECAI-00,
+pp. 338-342, IOS Press, 2000.
+[2] A. Bracciali and P. Torroni. A new framework for
+knowledge revision of abductive agents through their
+interaction. In: Proc. CLIMA-IV, Computational Logic
+in Multi-Agent Systems, LNAI 3259, pp. 159-177, 2004.
+[3] W. Chen, M. Zhang, and N. Foo. Repeated negotiation
+of logic programs. In: Proc. 7th Workshop on
+Nonmonotonic Reasoning, Action and Change, 2006.
+[4] W. W. Chu, Q. Chen, and R.-C. Lee. Cooperative
+query answering via type abstraction hierarchy. In:
+Cooperating Knowledge Based Systems, S. M. Deen ed.,
+pp. 271-290, Springer, 1990.
+[5] N. Foo, T. Meyer, Y. Zhang, and D. Zhang.
+Negotiating logic programs. In: Proc. 6th Workshop on
+Nonmonotonic Reasoning, Action and Change, 2005.
+[6] T. Gaasterland, P. Godfrey, and J. Minker. Relaxation
+as a platform for cooperative answering. Journal of
+Intelligence Information Systems 1(3/4):293-321, 1992.
+[7] M. Gelfond and V. Lifschitz. Classical negation in logic
+programs and disjunctive databases. New Generation
+Computing 9:365-385, 1991.
+[8] K. Inoue and C. Sakama. Abductive framework for
+nonmonotonic theory change. In: Proc. IJCAI-95,
+pp. 204-210, Morgan Kaufmann.
+[9] A. C. Kakas, R. A. Kowalski, and F. Toni, The role of
+abduction in logic programming. In: Handbook of Logic
+in AI and Logic Programming, D. M. Gabbay, et al.
+(eds), vol. 5, pp. 235-324, Oxford University Press, 1998.
+[10] A. C. Kakas and P. Moraitis. Adaptive agent
+negotiation via argumentation. In: Proc. AAMAS-06,
+pp. 384-391, ACM Press.
+[11] T. Meyer, N. Foo, R. Kwok, and D. Zhang. Logical
+foundation of negotiation: outcome, concession and
+adaptation. In: Proc. AAAI-04, pp. 293-298, MIT Press.
+[12] R. S. Michalski. A theory and methodology of
+inductive learning. In: Machine Learning: An Artificial
+Intelligence Approach, R. S. Michalski, et al. (eds),
+pp. 83-134, Morgan Kaufmann, 1983.
+[13] S. Parsons, C. Sierra and N. Jennings. Agents that
+reason and negotiate by arguing. Journal of Logic and
+Computation, 8(3):261-292, 1988.
+[14] F. Sadri, F. Toni, and P. Torroni, An abductive logic
+programming architecture for negotiating agents. In:
+Proc. 8th European Conf. on Logics in AI, LNAI 2424,
+pp. 419-431, Springer, 2002.
+[15] C. Sakama and K. Inoue. An abductive framework for
+computing knowledge base updates. Theory and Practice
+of Logic Programming 3(6):671-715, 2003.
+The Sixth Intl. Joint Conf. on Autonomous Agents and Multi-Agent Systems (AAMAS 07) 1029

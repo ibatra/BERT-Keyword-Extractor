@@ -1,0 +1,652 @@
+Heuristics-Based Scheduling of
+Composite Web Service Workloads
+Thomas Phan Wen-Syan Li
+IBM Almaden Research Center
+650 Harry Rd.
+San Jose, CA 95120
+{phantom,wsl}@us.ibm.com
+ABSTRACT
+Web services can be aggregated to create composite workflows that
+provide streamlined functionality for human users or other systems.
+Although industry standards and recent research have sought to 
+define best practices and to improve end-to-end workflow 
+composition, one area that has not fully been explored is the scheduling
+of a workflow"s web service requests to actual service 
+provisioning in a multi-tiered, multi-organisation environment. This issue
+is relevant to modern business scenarios where business processes
+within a workflow must complete within QoS-defined limits. 
+Because these business processes are web service consumers, service
+requests must be mapped and scheduled across multiple web 
+service providers, each with its own negotiated service level 
+agreement. In this paper we provide heuristics for scheduling service
+requests from multiple business process workflows to web service
+providers such that a business value metric across all workflows is
+maximised. We show that a genetic search algorithm is appropriate
+to perform this scheduling, and through experimentation we show
+that our algorithm scales well up to a thousand workflows and 
+produces better mappings than traditional approaches.
+Categories and Subject Descriptors
+C.2.4 [Computer-Communication Networks]: Distributed 
+Systems-distributed applications; D.2.8 [Software Engineering]:
+Metrics-complexity measures, performance measures
+1. INTRODUCTION
+Web services can be composed into workflows to provide 
+streamlined end-to-end functionality for human users or other systems.
+Although previous research efforts have looked at ways to 
+intelligently automate the composition of web services into workflows
+(e.g. [1, 9]), an important remaining problem is the assignment of
+web service requests to the underlying web service providers in a
+multi-tiered runtime scenario within constraints. In this paper we
+address this scheduling problem and examine means to manage a
+large number of business process workflows in a scalable manner.
+The problem of scheduling web service requests to providers is
+relevant to modern business domains that depend on multi-tiered
+service provisioning. Consider the example shown in Figure 1
+that illustrates our problem space. Workflows comprise multiple
+related business processes that are web service consumers; here we
+assume that the workflows represent requested service from 
+customers or automated systems and that the workflow has already
+been composed with an existing choreography toolkit. These 
+workflows are then submitted to a portal (not shown) that acts as a
+scheduling agent between the web service consumers and the web
+service providers.
+In this example, a workflow could represent the actions needed to
+instantiate a vacation itinerary, where one business process requests
+booking an airline ticket, another business process requests a hotel
+room, and so forth. Each of these requests target a particular service
+type (e.g. airline reservations, hotel reservations, car reservations,
+etc.), and for each service type, there are multiple instances of 
+service providers that publish a web service interface. An important
+challenge is that the workflows must meet some quality-of-service
+(QoS) metric, such as end-to-end completion time of all its business
+processes, and that meeting or failing this goal results in the 
+assignment of a quantitative business value metric for the workflow; 
+intuitively, it is desired that all workflows meet their respective QoS
+goals. We further leverage the notion that QoS service agreements
+are generally agreed-upon between the web service providers and
+the scheduling agent such that the providers advertise some level
+of guaranteed QoS to the scheduler based upon runtime conditions
+such as turnaround time and maximum available concurrency. The
+resulting problem is then to schedule and assign the business 
+processes" requests for service types to one of the service providers
+for that type. The scheduling must be done such that the aggregate
+business value across all the workflows is maximised.
+In Section 3 we state the scenario as a combinatorial problem and
+utilise a genetic search algorithm [5] to find the best assignment
+of web service requests to providers. This approach converges 
+towards an assignment that maximises the overall business value for
+all the workflows.
+In Section 4 we show through experimentation that this search
+heuristic finds better assignments than other algorithms (greedy,
+round-robin, and proportional). Further, this approach allows us to
+scale the number of simultaneous workflows (up to one thousand
+workflows in our experiments) and yet still find effective schedules.
+2. RELATED WORK
+In the context of service assignment and scheduling, [11] maps
+web service calls to potential servers using linear programming, but
+their work is concerned with mapping only single workflows; our
+principal focus is on scalably scheduling multiple workflows (up
+30
+Service Type
+SuperHotels.com
+Business
+Process
+Business
+Process
+Workflow
+...
+Business
+Process
+Business
+Process
+...
+HostileHostels.com
+IncredibleInns.com
+Business
+Process
+Business
+Process
+Business
+Process
+...
+Business
+Process
+Service
+Provider
+SkyHighAirlines.com
+SuperCrazyFlights.com
+Business
+Process
+.
+.
+.
+.
+.
+.
+Advertised QoS
+Service Agreement
+CarRentalService.com
+Figure 1: An example scenario demonstrating the interaction between business processes in workflows and web service providers.
+Each business process accesses a service type and is then mapped to a service provider for that type.
+to one thousand as we show later) using different business 
+metrics and a search heuristic. [10] presents a dynamic 
+provisioning approach that uses both predictive and reactive techniques for
+multi-tiered Internet application delivery. However, the 
+provisioning techniques do not consider the challenges faced when there are
+alternative query execution plans and replicated data sources. [8]
+presents a feedback-based scheduling mechanism for multi-tiered
+systems with back-end databases, but unlike our work, it assumes
+a tighter coupling between the various components of the system.
+Our work also builds upon prior scheduling research. The classic
+job-shop scheduling problem, shown to be NP-complete [4] [3], is
+similar to ours in that tasks within a job must be scheduled onto 
+machinery (c.f. our scenario is that business processes within a 
+workflow must be scheduled onto web service providers). The salient
+differences are that the machines can process only one job at a time
+(we assume servers can multi-task but with degraded performance
+and a maximum concurrency level), tasks within a job cannot 
+simultaneously run on different machines (we assume business 
+processes can be assigned to any available server), and the principal
+metric of performance is the makespan, which is the time for the
+last task among all the jobs to complete (and as we show later, 
+optimising on the makespan is insufficient for scheduling the business
+processes, necessitating different metrics).
+3. DESIGN
+In this section we describe our model and discuss how we can
+find scheduling assignments using a genetic search algorithm.
+3.1 Model
+We base our model on the simplified scenario shown in Figure
+1. Specifically, we assume that users or automated systems request
+the execution of a workflow. The workflows comprise business 
+processes, each of which makes one web service invocation to a 
+service type. Further, business processes have an ordering in the 
+workflow. The arrangement and execution of the business processes and
+the data flow between them are all managed by a composition or
+choreography tool (e.g. [1, 9]). Although composition languages
+can use sophisticated flow-control mechanisms such as conditional
+branches, for simplicity we assume the processes execute 
+sequentially in a given order.
+This scenario can be naturally extended to more complex 
+relationships that can be expressed in BPEL [7], which defines how
+business processes interact, messages are exchanged, activities are
+ordered, and exceptions are handled. Due to space constraints,
+we focus on the problem space presented here and will extend our
+model to more advanced deployment scenarios in the future.
+Each workflow has a QoS requirement to complete within a 
+specified number of time units (e.g. on the order of seconds, as 
+detailed in the Experiments section). Upon completion (or failure),
+the workflow is assigned a business value. We extended this 
+approach further and considered different types of workflow 
+completion in order to model differentiated QoS levels that can be applied
+by businesses (for example, to provide tiered customer service).
+We say that a workflow is successful if it completes within its QoS
+requirement, acceptable if it completes within a constant factor κ
+31
+of its QoS bound (in our experiments we chose κ=3), or failing
+if it finishes beyond κ times its QoS bound. For each category,
+a business value score is assigned to the workflow, with the 
+successful category assigned the highest positive score, followed by
+acceptable and then failing. The business value point 
+distribution is non-uniform across workflows, further modelling cases
+where some workflows are of higher priority than others.
+Each service type is implemented by a number of different 
+service providers. We assume that the providers make service level
+agreements (SLAs) to guarantee a level of performance defined by
+the completion time for completing a web service invocation. 
+Although SLAs can be complex, in this paper we assume for 
+simplicity that the guarantees can take the form of a linear performance
+degradation under load. This guarantee is defined by several 
+parameters: α is the expected completion time (for example, on the
+order of seconds) if the assigned workload of web service requests
+is less than or equal to β, the maximum concurrency, and if the
+workload is higher than β, the expected completion for a workload
+of size ω is α+ γ(ω − β) where γ is a fractional coefficient. In our
+experiments we vary α, β, and γ with different distributions.
+Ideally, all workflows would be able to finish within their QoS
+limits and thus maximise the aggregate business value across all
+workflows. However, because we model service providers with
+degrading performance under load, not all workflows will achieve
+their QoS limit: it may easily be the case that business processes
+are assigned to providers who are overloaded and cannot complete
+within the respective workflow"s QoS limit. The key research 
+problem, then, is to assign the business processes to the web service
+providers with the goal of optimising on the aggregate business
+value of all workflows.
+Given that the scope of the optimisation is the entire set of 
+workflows, it may be that the best scheduling assignments may result in
+some workflows having to fail in order for more workflows to 
+succeed. This intuitive observation suggests that traditional scheduling
+approaches such as round-robin or proportional assignments will
+not fare well, which is what we observe and discuss in Section 4.
+On the other hand, an exhaustive search of all the possible 
+assignments will find the best schedule, but the computational complexity
+is prohibitively high. Suppose there are W workflows with an 
+average of B business processes per workflow. Further, in the worst
+case each business process requests one service type, for which
+there are P providers. There are thus W · PB
+combinations to
+explore to find the optimal assignments of business processes to
+providers. Even for small configurations (e.g. W =10, B=5, P=10),
+the computational time for exhaustive search is significant, and in
+our work we look to scale these parameters. In the next subsection,
+discuss how a genetic search algorithm can be used to converge
+toward the optimum scheduling assignments.
+3.2 Genetic algorithm
+Given an exponential search space of business process 
+assignments to web service providers, the problem is to find the optimal
+assignment that produces the overall highest aggregate business
+value across all workflows. To explore the solution space, we use
+a genetic algorithm (GA) search heuristic that simulates Darwinian
+natural selection by having members of a population compete to
+survive in order to pass their genetic chromosomes onto the next
+generation; after successive generations, there is a tendency for the
+chromosomes to converge toward the best combination [5] [6].
+Although other search heuristics exist that can solve 
+optimization problems (e.g. simulated annealing or steepest-ascent 
+hillclimbing), the business process scheduling problem fits well with a
+GA because potential solutions can be represented in a matrix form
+and allows us to use prior research in effective GA chromosome
+recombination to form new members of the population (e.g. [2]).
+0 1 2 3 4
+0 1 2 0 2 1
+1 0 1 0 1 0
+2 1 2 0 0 1
+Figure 2: An example chromosome representing a scheduling
+assignment of (workflow,service type) → service provider. Each
+row represents a workflow, and each column represents a 
+service type. For example, here there are 3 workflows (0 to 2) and
+5 service types (0 to 4). In workflow 0, any request for service
+type 3 goes to provider 2. Note that the service provider 
+identifier is within a range limited to its service type (i.e. its column),
+so the 2 listed for service type 3 is a different server from
+server 2 in other columns.
+Chromosome representation of a solution. In Figure 2 we
+show an example chromosome that encodes one scheduling 
+assignment. The representation is a 2-dimensional matrix that maps
+{workflow, service type} to a service provider. For a business 
+process in workflow i and utilising service type j, the (i, j)th
+entry in
+the table is the identifier for the service provider to which the 
+business process is assigned. Note that the service provider identifier is
+within a range limited to its service type.
+GA execution. A GA proceeds as follows. Initially a random
+set of chromosomes is created for the population. The 
+chromosomes are evaluated (hashed) to some metric, and the best ones
+are chosen to be parents. In our problem, the evaluation produces
+the net business value across all workflows after executing all 
+business processes once they are assigned to their respective service
+providers according to the mapping in the chromosome. The 
+parents recombine to produce children, simulating sexual crossover,
+and occasionally a mutation may arise which produces new 
+characteristics that were not available in either parent. The principal idea
+is that we would like the children to be different from the parents
+(in order to explore more of the solution space) yet not too 
+different (in order to contain the portions of the chromosome that result
+in good scheduling assignments). Note that finding the global 
+optimum is not guaranteed because the recombination and mutation
+are stochastic.
+GA recombination and mutation. As mentioned, the 
+chromosomes are 2-dimensional matrices that represent scheduling 
+assignments. To simulate sexual recombination of two chromosomes to
+produce a new child chromosome, we applied a one-point crossover
+scheme twice (once along each dimension). The crossover is best
+explained by analogy to Cartesian space as follows. A random
+point is chosen in the matrix to be coordinate (0, 0). Matrix 
+elements from quadrants II and IV from the first parent and elements
+from quadrants I and III from the second parent are used to create
+the new child. This approach follows GA best practices by keeping
+contiguous chromosome segments together as they are transmitted
+from parent to child.
+The uni-chromosome mutation scheme randomly changes one
+of the service provider assignments to another provider within the
+available range. Other recombination and mutation schemes are an
+area of research in the GA community, and we look to explore new
+operators in future work.
+GA evaluation function. An important GA component is the
+evaluation function. Given a particular chromosome representing
+one scheduling mapping, the function deterministically calculates
+the net business value across all workloads. The business 
+processes in each workload are assigned to service providers, and each
+provider"s completion time is calculated based on the service 
+agreement guarantee using the parameters mentioned in Section 3.1,
+namely the unloaded completion time α, the maximum 
+concur32
+rency β, and a coefficient γ that controls the linear performance
+degradation under heavy load. Note that the evaluation function
+can be easily replaced if desired; for example, other evaluation
+functions can model different service provider guarantees or 
+parallel workflows.
+4. EXPERIMENTS AND RESULTS
+In this section we show the benefit of using our GA-based 
+scheduler. Because we wanted to scale the scenarios up to a large number
+of workflows (up to 1000 in our experiments), we implemented a
+simulation program that allowed us to vary parameters and to 
+measure the results with different metrics. The simulator was written
+in standard C++ and was run on a Linux (Fedora Core) desktop
+computer running at 2.8 GHz with 1GB of RAM.
+We compared our algorithm against alternative candidates:
+• A well-known round-robin algorithm that assigns each 
+business process in circular fashion to the service providers for a
+particular service type. This approach provides the simplest
+scheme for load-balancing.
+• A random-proportional algorithm that proportionally assigns
+business processes to the service providers; that is, for a
+given service type, the service providers are ranked by their
+guaranteed completion time, and business processes are 
+assigned proportionally to the providers based on their 
+completion time. (We also tried a proportionality scheme based
+on both the completion times and maximum concurrency but
+attained the same results, so only the former scheme"s results
+are shown here.)
+• A strawman greedy algorithm that always assigns business
+processes to the service provider that has the fastest 
+guaranteed completion time. This algorithm represents a naive 
+approach based on greedy, local observations of each workflow
+without taking into consideration all workflows.
+In the experiments that follow, all results were averaged across
+20 trials, and to help normalise the effects of randomisation used
+during the GA, each trial started by reading in pre-initialised data
+from disk. In Table 1 we list our experimental parameters.
+In Figure 3 we show the results of running our GA against the
+three candidate alternatives. The x-axis shows the number for 
+workflows scaled up to 1000, and the y-axis shows the aggregate 
+business value for all workflows. As can be seen, the GA consistently
+produces the highest business value even as the number of 
+workflows grows; at 1000 workflows, the GA produces a 115% 
+improvement over the next-best alternative. (Note that although we
+are optimising against the business value metric we defined earlier,
+genetic algorithms are able to converge towards the optimal value
+of any metric, as long as the evaluation function can consistently
+measure a chromosome"s value with that metric.)
+As expected, the greedy algorithm performs very poorly because
+it does the worst job at balancing load: all business processes for
+a given service type are assigned to only one server (the one 
+advertised to have the fastest completion time), and as more 
+business processes arrive, the provider"s performance degrades linearly.
+The round-robin scheme is initially outperformed by the 
+randomproportional scheme up to around 120 workflows (as shown in the
+magnified graph of Figure 4), but as the number of workflows 
+increases, the round-robin scheme consistently wins over 
+randomproportional. The reason is that although the random-proportional
+scheme assigns business processes to providers proportionally 
+according to the advertised completion times (which is a measure of
+the power of the service provider), even the best providers will
+eventually reach a real-world maximum concurrency for the large
+-2000
+-1000
+0
+1000
+2000
+3000
+4000
+5000
+6000
+7000
+0 200 400 600 800 1000
+Aggregatebusinessvalueacrossallworkflows
+Total number of workflows
+Business value scores of scheduling algorithms
+Genetic algorithm
+Round robin
+Random proportional
+Greedy
+Figure 3: Net business value scores of different scheduling algorithms.
+-500
+0
+500
+1000
+1500
+2000
+2500
+3000
+3500
+4000
+0 50 100 150 200Aggregatebusinessvalueacrossallworkflows
+Total number of workflows
+Business value scores of scheduling algorithms
+Genetic algorithm
+Round robin
+Random proportional
+Greedy
+Figure 4: Magnification of the left-most region in Figure 3.
+number of workflows that we are considering. For a very large
+number of workflows, the round-robin scheme is able to better 
+balance the load across all service providers.
+To better understand the behaviour resulting from the scheduling
+assignments, we show the workflow completion results in Figures
+5, 6, and 7 for 100, 500, and 900 workflows, respectively. These
+figures show the percentage of workflows that are successful (can
+complete with their QoS limit), acceptable (can complete within
+κ=3 times their QoS limit), and failed (cannot complete within κ=3
+times their QoS limit). The GA consistently produces the highest
+percentage of successful workflows (resulting in higher business
+values for the aggregate set of workflows). Further, the round-robin
+scheme produces better results than the random-proportional for a
+large number of workflows but does not perform as well as the GA.
+In Figure 8 we graph the makespan resulting from the same
+experiments above. Makespan is a traditional metric from the job
+scheduling community measuring elapsed time for the last job to
+complete. While useful, it does not capture the high-level business
+value metric that we are optimising against. Indeed, the makespan
+is oblivious to the fact that we provide multiple levels of 
+completion (successful, acceptable, and failed) and assign business value
+scores accordingly. For completeness, we note that the GA 
+provides the fastest makespan, but it is matched by the round robin
+algorithm. The GA produces better business values (as shown in
+Figure 3) because it is able to search the solution space to find 
+better mappings that produce more successful workflows (as shown in
+Figures 5 to 7).
+We also looked at the effect of the scheduling algorithms on
+balancing the load. Figure 9 shows the percentage of services
+providers that were accessed while the workflows ran. As expected,
+the greedy algorithm always hits one service provider; on the other
+hand, the round-robin algorithm is the fastest to spread the business
+33
+Experimental parameter Comment
+Workflows 5 to 1000
+Business processes per workflow uniform random: 1 - 10
+Service types 10
+Service providers per service type uniform random: 1 - 10
+Workflow QoS goal uniform random: 10-30 seconds
+Service provider completion time (α) uniform random: 1 - 12 seconds
+Service provider maximum concurrency (β) uniform random: 1 - 12
+Service provider degradation coefficient (γ) uniform random: 0.1 - 0.9
+Business value for successful workflows uniform random: 10 - 50 points
+Business value for acceptable workflows uniform random: 0 - 10 points
+Business value for failed workflows uniform random: -10 - 0 points
+GA: number of parents 20
+GA: number of children 80
+GA: number of generations 1000
+Table 1: Experimental parameters
+Failed
+Acceptable (completed but not within QoS)
+Successful (completed within QoS)
+0%
+20%
+40%
+60%
+80%
+100%
+RoundRobinRandProportionalGreedyGeneticAlg
+Percentageofallworkflows
+Workflow behaviour, 100 workflows
+Figure 5: Workflow behaviour for 100 workflows.
+Failed
+Acceptable (completed but not within QoS)
+Successful (completed within QoS)
+0%
+20%
+40%
+60%
+80%
+100%
+RoundRobinRandProportionalGreedyGeneticAlg
+Percentageofallworkflows
+Workflow behaviour, 500 workflows
+Figure 6: Workflow behaviour for 500 workflows.
+Failed
+Acceptable (completed but not within QoS)
+Successful (completed within QoS)
+0%
+20%
+40%
+60%
+80%
+100%
+RoundRobinRandProportionalGreedyGeneticAlg
+Percentageofallworkflows
+Workflow behaviour, 500 workflows
+Figure 7: Workflow behaviour for 900 workflows.
+0
+50
+100
+150
+200
+250
+300
+0 200 400 600 800 1000
+Makespan[seconds]
+Number of workflows
+Maximum completion time for all workflows
+Genetic algorithm
+Round robin
+Random proportional
+Greedy
+Figure 8: Maximum completion time for all workflows. This value
+is the makespan metric used in traditional scheduling research. 
+Although useful, the makespan does not take into consideration the 
+business value scoring in our problem domain.
+processes. Figure 10 is the percentage of accessed service providers
+(that is, the percentage of service providers represented in Figure
+9) that had more assigned business processes than their advertised
+maximum concurrency. For example, in the greedy algorithm only
+one service provider is utilised, and this one provider quickly 
+becomes saturated. On the other hand, the random-proportional 
+algorithm uses many service providers, but because business processes
+are proportionally assigned with more assignments going to the
+better providers, there is a tendency for a smaller percentage of
+providers to become saturated.
+For completeness, we show the performance of the genetic 
+algorithm itself in Figure 11. The algorithm scales linearly with an
+increasing number of workflows. We note that the round-robin,
+random-proportional, and greedy algorithms all finished within 1
+second even for the largest workflow configuration. However, we
+feel that the benefit of finding much higher business value scores
+justifies the running time of the GA; further we would expect that
+the running time will improve with both software tuning as well as
+with a computer faster than our off-the-shelf PC.
+5. CONCLUSION
+Business processes within workflows can be orchestrated to 
+access web services. In this paper we looked at multi-tiered service
+provisioning where web service requests to service types can be
+mapped to different service providers. The resulting problem is
+that in order to support a very large number of workflows, the
+assignment of business process to web service provider must be
+intelligent. We used a business value metric to measure the 
+be34
+0
+0.2
+0.4
+0.6
+0.8
+1
+0 200 400 600 800 1000
+Percentageofallserviceproviders
+Number of workflows
+Service providers utilised
+Genetic algorithm
+Round robin
+Random proportional
+Greedy
+Figure 9: The percentage of service providers utilized during 
+workload executions. The Greedy algorithm always hits the one service
+provider, while the Round Robin algorithm spreads requests evenly
+across the providers.
+0
+0.2
+0.4
+0.6
+0.8
+1
+0 200 400 600 800 1000
+Percentageofallserviceproviders
+Number of workflows
+Service providers saturated
+Genetic algorithm
+Round robin
+Random proportional
+Greedy
+Figure 10: The percentage of service providers that are saturated
+among those providers who were utilized (that is, percentage of the 
+service providers represented in Figure 9). A saturated service provider
+is one whose workload is greater that its advertised maximum 
+concurrency.
+0
+5
+10
+15
+20
+25
+0 200 400 600 800 1000
+Runningtimeinseconds
+Total number of workflows
+Running time of genetic algorithm
+GA running time
+Figure 11: Running time of the genetic algorithm.
+haviour of workflows meeting or failing QoS values, and we 
+optimised our scheduling to maximise the aggregate business value
+across all workflows. Since the solution space of scheduler 
+mappings is exponential, we used a genetic search algorithm to search
+the space and converge toward the best schedule. With a default
+configuration for all parameters and using our business value 
+scoring, the GA produced up to 115% business value improvement over
+the next best algorithm. Finally, because a genetic algorithm will
+converge towards the optimal value using any metric (even other
+than the business value metric we used), we believe our approach
+has strong potential for continuing work.
+In future work, we look to acquire real-world traces of web 
+service instances in order to get better estimates of service agreement
+guarantees, although we expect that such guarantees between the
+providers and their consumers are not generally available to the
+public. We will also look at other QoS metrics such as CPU and
+I/O usage. For example, we can analyse transfer costs with 
+varying bandwidth, latency, data size, and data distribution. Further,
+we hope to improve our genetic algorithm and compare it to more
+scheduler alternatives. Finally, since our work is complementary
+to existing work in web services choreography (because we rely on
+pre-configured workflows), we look to integrate our approach with
+available web service workflow systems expressed in BPEL.
+6. REFERENCES
+[1] A. Ankolekar, et al. DAML-S: Semantic Markup For Web
+Services, In Proc. of the Int"l Semantic Web Working
+Symposium, 2001.
+[2] L. Davis. Job Shop Scheduling with Genetic Algorithms,
+In Proc. of the Int"l Conference on Genetic Algorithms, 1985.
+[3] H.-L. Fang, P. Ross, and D. Corne. A Promising Genetic
+Algorithm Approach to Job-Shop Scheduling, Rescheduling,
+and Open-Shop Scheduling Problems , In Proc. on the 5th
+Int"l Conference on Genetic Algorithms, 1993.
+[4] M. Gary and D. Johnson. Computers and Intractability: A
+Guide to the Theory of NP-Completeness, Freeman, 1979.
+[5] J. Holland. Adaptation in Natural and Artificial Systems:
+An Introductory Analysis with Applications to Biology,
+Control, and Artificial Intelligence, MIT Press, 1992.
+[6] D. Goldberg. Genetic Algorithms in Search, Optimization
+and Machine Learning, Kluwer Academic Publishers, 1989.
+[7] Business Processes in a Web Services World,
+www-128.ibm.com/developerworks/
+webservices/library/ws-bpelwp/.
+[8] G. Soundararajan, K. Manassiev, J. Chen, A. Goel, and C.
+Amza. Back-end Databases in Shared Dynamic Content
+Server Clusters, In Proc. of the IEEE Int"l Conference on
+Autonomic Computing, 2005.
+[9] B. Srivastava and J. Koehler. Web Service Composition
+Current Solutions and Open Problems, ICAP, 2003.
+[10] B. Urgaonkar, P. Shenoy, A. Chandra, and P. Goyal.
+Dynamic Provisioning of Multi-Tier Internet Applications,
+In Proc. of the IEEE Int"l Conference on Autonomic
+Computing, 2005.
+[11] L. Zeng, B. Benatallah, M. Dumas, J. Kalagnanam, and Q.
+Sheng. Quality Driven Web Services Composition, In
+Proc. of the WWW Conference, 2003.
+35

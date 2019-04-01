@@ -1,0 +1,789 @@
+Runtime Metrics Collection for Middleware Supported
+Adaptation of Mobile Applications
+Hendrik Gani
+School of Computer Science and
+Information Technology,
+RMIT University, Melbourne, Australia
+hgani@cs.rmit.edu.au
+Caspar Ryan
+School of Computer Science and
+Information Technology,
+RMIT University, Melbourne, Australia
+caspar@cs.rmit.edu.au
+Pablo Rossi
+School of Computer Science and
+Information Technology,
+RMIT University, Melbourne, Australia
+pablo@cs.rmit.edu.au
+ABSTRACT
+This paper proposes, implements, and evaluates in terms of worst
+case performance, an online metrics collection strategy to
+facilitate application adaptation via object mobility using a mobile
+object framework and supporting middleware. The solution is
+based upon an abstract representation of the mobile object system,
+which holds containers aggregating metrics for each specific
+component including host managers, runtimes and mobile objects.
+A key feature of the solution is the specification of multiple
+configurable criteria to control the measurement and propagation
+of metrics through the system. The MobJeX platform was used as
+the basis for implementation and testing with a number of
+laboratory tests conducted to measure scalability, efficiency and
+the application of simple measurement and propagation criteria to
+reduce collection overhead.
+Categories and Subject Descriptors
+C.2.4 Distributed Systems; D.2.8 Metrics
+General Terms
+Measurement, Performance.
+1. INTRODUCTION
+The different capabilities of mobile devices, plus the varying
+speed, error rate and disconnection characteristics of mobile
+networks [1], make it difficult to predict in advance the exact
+execution environment of mobile applications. One solution
+which is receiving increasing attention in the research community
+is application adaptation [2-7], in which applications adjust their
+behaviour in response to factors such as network, processor, or
+memory usage.
+Effective adaptation requires detailed and up to date
+information about both the system and the software itself. Metrics
+related to system wide information (e.g. processor, memory and
+network load) are referred to as environmental metrics [5], while
+metrics representing application behaviour are referred as
+software metrics [8]. Furthermore, the type of metrics required for
+performing adaptation is dependent upon the type of adaptation
+required. For example, service-based adaptation, in which service
+quality or service behaviour is modified in response to changes in
+the runtime environment, generally requires detailed
+environmental metrics but only simple software metrics [4]. On
+the other hand, adaptation via object mobility [6], also requires
+detailed software metrics [9] since object placement is dependent
+on the execution characteristics of the mobile objects themselves.
+With the exception of MobJeX [6], existing mobile object
+systems such as Voyager [10], FarGo [11, 12], and JavaParty [13]
+do not provide automated adaptation, and therefore lack the
+metrics collection process required to support this process. In the
+case of MobJeX, although an adaptation engine has been
+implemented [5], preliminary testing was done using synthetic
+pre-scripted metrics since there is little prior work on the dynamic
+collection of software metrics in mobile object frameworks, and
+no existing means of automatically collecting them.
+Consequently, the main contribution of this paper is a solution
+for dynamic metrics collection to support adaptation via object
+mobility for mobile applications. This problem is non-trivial since
+typical mobile object frameworks consist of multiple application
+and middleware components, and thus metrics collection must be
+performed at different locations and the results efficiently
+propagated to the adaptation engine. Furthermore, in some cases
+the location where each metric should be collected is not fixed
+(i.e. it could be done in several places) and thus a decision must
+be made based on the efficiency of the chosen solution (see
+section 3).
+The rest of this paper is organised as follows: Section 2
+describes the general structure and implementation of mobile
+object frameworks in order to understand the challenges related to
+the collection, propagation and delivery of metrics as described in
+section 3. Section 4 describes some initial testing and results and
+section 5 closes with a summary, conclusions and discussion of
+future work.
+2. BACKGROUND
+In general, an object-oriented application consists of objects
+collaborating to provide the functionality required by a given
+problem domain. Mobile object frameworks allow some of these
+objects to be tagged as mobile objects, providing middleware
+support for such objects to be moved at runtime to other hosts. At
+a minimum, a mobile object framework with at least one running
+mobile application consists of the following components:
+runtimes, mobile objects, and proxies [14], although the
+terminology used by individual frameworks can differ [6, 10-13].
+A runtime is a container process for the management of
+mobile objects. For example, in FarGo [15] this component is
+known as a core and in most systems separate runtimes are
+required to allow different applications to run independently,
+although this is not the case with MobJeX, which can run multiple
+applications in a single runtime using threads. The applications
+themselves comprise mobile objects, which interact with each
+other through proxies [14]. Proxies, which have the same method
+interface as the object itself but add remote communication and
+object tracking functionality, are required for each target object
+that a source object communicates with. Upon migration, proxy
+objects move with the source object.
+The Java based system MobJeX, which is used as the
+implementation platform for the metrics collection solution
+described in this paper, adds a number of additional middleware
+components. Firstly, a host manager (known as a service in
+MobJeX) provides a central point of communication by running
+on a known port on a per host basis, thus facilitating the
+enumeration or lookup of components such as runtimes or mobile
+objects. Secondly, MobJeX has a per-application mobile object
+container called a transport manager (TM). As such the host and
+transport managers are considered in the solution provided in the
+next section but could be omitted in the general case. Finally,
+depending on adaptation mode, MobJeX can have a centralised
+system controller incorporating a global adaptation engine for
+performing system wide optimisation.
+3. METRICS COLLECTION
+This section discusses the design and derivation of a solution
+for collecting metrics in order to support the adaptation of
+applications via object migration. The solution, although
+implemented within the MobJeX framework, is for the most part
+discussed in generic terms, except where explicitly stated to be
+MobJeX specific.
+3.1 Metrics Selection
+The metrics of Ryan and Rossi [9] have been chosen as the
+basis for this solution, since they are specifically intended for
+mobile application adaptation as well as having been derived from
+a series of mathematical models and empirically validated.
+Furthermore, the metrics were empirically shown to improve the
+application performance in a real adaptation scenario following a
+change in the execution environment.
+It would however be beyond the scope of this paper to
+implement and test the full suite of metrics listed in [9], and thus
+in order to provide a useful non-random subset, we chose to
+implement the minimum set of metrics necessary to implement
+local and global adaptation [9] and thereby satisfy a range of real
+adaptation scenarios. As such the solution presented in this
+section is discussed primarily in terms of these metrics, although
+the structure of the solution is intended to support the
+implementation of the remaining metrics, as well as other
+unspecified metrics such as those related to quality and resource
+utilisation. This subset is listed below and categorised according
+to metric type. Note that some additional metrics were used for
+implementation purposes in order to derive core metrics or assist
+the evaluation, and as such are defined in context where
+appropriate.
+1. Software metrics
+- Number of Invocations (NI), the frequency of invocations on
+methods of a class.
+2. Performance metrics
+- Method Execution Time (ET), the time taken to execute a
+method body (ms).
+- Method Invocation Time (IT), the time taken to invoke a
+method, excluding the method execution time (ms).
+3. Resource utilization metrics
+- Memory Usage (MU), the memory usage of a process (in
+bytes).
+- Processor Usage (PU), the percentage of the CPU load of a
+host.
+- Network Usage (NU), the network bandwidth between two
+hosts (in bytes/sec).
+Following are brief examples of a number of these metrics in
+order to demonstrate their usage in an adaptation scenario. As
+Processor Usage (PU) on a certain host increases, the Execution
+Time (ET) of a given method executed on that host also increases
+[9], thus facilitating the decision of whether to move an object
+with high ET to another host with low PU. Invocation Time (IT)
+shows the overhead of invoking a certain method, with the
+invocation overhead of marshalling parameters and transmitting
+remote data for a remote call being orders of magnitude higher
+than the cost of pushing and popping data from the method call
+stack. In other words, remote method invocation is expensive and
+thus should be avoided unless the gains made by moving an
+object to a host with more processing power (thereby reducing
+ET) outweigh the higher IT of the remote call. Finally, Number of
+Invocations (NI) is used primarily as a weighting factor or
+multiplier in order to enable the adaptation engine to predict the
+value over time of a particular adaptation decision.
+3.2 Metrics Measurement
+This subsection discusses how each of the metrics in the
+subset under investigation can be obtained in terms of either direct
+measurement or derivation, and where in the mobile object
+framework such metrics should actually be measured. Of the
+environmental resource metrics, Processor Usage (PU) and
+Network Usage (NU) both relate to an individual machine, and
+thus can be directly measured through the resource monitoring
+subsystem that is instantiated as part of the MobJeX service.
+However, Memory Usage (MU), which represents the memory
+state of a running process rather than the memory usage of a host,
+should instead be collected within an individual runtime.
+The measurement of Number of Invocations (NI) and
+Execution Time (ET) metrics can be also be performed via direct
+measurement, however in this case within the mobile object
+implementation (mobject) itself.
+NI involves simply incrementing a counter value at either the
+start or end of a method call, depending upon the desired
+semantics with regard to thrown exceptions, while ET can be
+measured by starting a timer at the beginning of the method and
+stopping it at the end of the method, then retrieving the duration
+recorded by the timer.
+In contrast, collecting Invocation Time (IT) is not as straight
+forward because the time taken to invoke a method can only be
+measured after the method finishes its execution and returns to the
+caller. In order to collect IT metrics, another additional metric is
+needed. Ryan and Rossi [9] define the metric Response Time
+(RT), as the total time taken for a method call to finish, which is
+the sum of IT and ET. The Response Time can be measured
+directly using the same timer based technique used to measure ET,
+although at the start and end of the proxy call rather than the
+method implementation. Once the Response Time (RT) is known,
+IT can derived by subtracting RT from ET.
+Although this derivation appears simple, in practice it is
+complicated by the fact that the RT and ET values from which the
+IT is derived are by necessity measured using timer code in
+different locations i.e. RT measured in the proxy, ET measured in
+the method body of the object implementation. In addition, the
+proxies are by definition not part of the MobJeX containment
+hierarchy, since although proxies have a reference to their target
+object, it is not efficient for a mobile object (mobject) to have
+backward references to all of the many proxies which reference it
+(one per source object). Fortunately, this problem can be solved
+using the push based propagation mechanism described in section
+3.5 in which the RT metric is pushed to the mobject so that IT can
+be derived from the ET value stored there. The derived value of IT
+is then stored and propagated further as necessary according to the
+criteria of section 3.6, the structural relationship of which is
+shown in Figure 1.
+3.3 Measurement Initiation
+The polling approach was identified as the most appropriate
+method for collecting resource utilisation metrics, such as
+Processor Usage (PU), Network Usage (NU) and Memory Usage
+(MU), since they are not part of, or related to, the direct flow of
+the application. To measure PU or NU, the resource monitor polls
+the Operating System for the current CPU or network load
+respectively. In the case of Memory Usage (MU), the Java Virtual
+Machine (JVM) [16] is polled for the current memory load. Note
+that in order to minimise the impact on application response time,
+the polling action should be done asynchronously in a separate
+thread. Metrics that are suitable for application initiated collection
+(i.e. as part of a normal method call) are software and
+performance related metrics, such as Number of Invocations (NI),
+Execution Time (ET), and Invocation Time (IT), which are
+explicitly related to the normal invocation of a method, and thus
+can be measured directly at this time.
+3.4 Metrics Aggregation
+In the solution presented in this paper, all metrics collected in
+the same location are aggregated in a MetricsContainer
+with individual containers corresponding to functional
+components in the mobile object framework. The primary
+advantage of aggregating metrics in containers is that it allows
+them to be propagated easily as a cohesive unit through the
+components of the mobility framework so that they can be
+delivered to the adaptation engine, as discussed in the following
+subsection.
+Note that this containment captures the different granularity of
+measurement attributes and their corresponding metrics. Consider
+the case of measuring memory consumption. At a coarse level of
+granularity this could be measured for an entire application or
+even a system, but could also be measured at the level of an
+individual object; or for an even finer level of granularity, the
+memory consumption during the execution of a specific method.
+As an example of the level of granularity required for mobility
+based adaptation, the local adaptation algorithm proposed by
+Ryan and Rossi [9] requires metrics representing both the
+duration of a method execution and the overhead of a method
+invocation. The use of metrics containers facilitates the collection
+of metrics at levels of granularity ranging from a single machine
+down to the individual method level.
+Note that some metrics containers do not contain any
+Metric objects, since as previously described, the sample
+implementation uses only a subset of the adaptation metrics from
+[9]. However, for the sake of consistency and to promote
+flexibility in terms of adding new metrics in the future, these
+containers are still considered in the present design for
+completeness and for future work.
+3.5 Propagation and Delivery of Metrics
+The solution in this paper identifies two stages in the metrics
+collection and delivery process. Firstly, the propagation of
+metrics through the components of the mobility framework and
+secondly, the delivery of those metrics from the host
+manager/service (or runtime if the host manager is not present) to
+the adaptation engine.
+Regarding propagation, in brief, it is proposed that when a
+lower level system component detects the arrival of a new metric
+update (e.g. mobile object), the metric is pushed (possibly along
+with other relevant metrics) to the next level component (i.e.
+runtime or transport manager containing the mobile object), which
+at some later stage, again determined by a configurable criteria
+(for example when there are a sufficient number of changed
+mobjects) will get pushed to the next level component (i.e. the
+host manager or the adaptation engine).
+A further incentive for treating propagation separately from
+delivery is due to the distinction between local and global
+adaptation [9]. Local adaptation is performed by an engine
+running on the local host (for example in MobJeX this would
+occur within the service) and thus in this case the delivery phase
+would be a local inter-process call. Conversely, global adaptation
+is handled by a centralised adaptation engine running on a remote
+host and thus the delivery of metrics is via a remote call, and in
+the case where multiple runtimes exist without a separate host
+manager the delivery process would be even more expensive.
+Therefore, due to the presence of network communication latency,
+it is important for the host manager to pass as many metrics as
+possible to the adaptation engine in one invocation, implying the
+need to gather these metrics in the host manager, through some
+form of push or propagation, before sending them to the
+adaptation engine.
+Consequently, an abstract representation or model [17] of the
+system needs to be maintained. Such a model would contain
+model entities, corresponding to each of the main system
+components, connected in a tree like hierarchy, which precisely
+reflects the structure and containment hierarchy of the actual
+system. Attaching metrics containers to model entities allows a
+model entity representing a host manager to be delivered to the
+adaptation engine enabling it to access all metrics in that
+component and any of its children (i.e. runtimes, and mobile
+objects). Furthermore it would generally be expected that an
+adaptation engine or system controller would already maintain a
+model of the system that can not only be reused for propagation
+but also provides an effective means of delivering metrics
+information from the host manager to the adaptation engine. The
+relationship between model entities and metrics containers is
+captured in Figure 1.
+3.6 Propagation and Delivery Criteria
+This subsection proposes flexible criteria to allow each
+component to decide when it should propagate its metrics to the
+next component in line (Figure 1), in order to reduce the overhead
+incurred when metrics are unnecessarily propagated through the
+components of the mobility framework and delivered to the
+adaptation engine.
+This paper proposes four different types of criterion that are
+executed at various stages of the measurement and propagation
+process in order to determine whether the next action should be
+taken or not. This approach was designed such that whenever a
+single criterion is not satisfied, the subsequent criteria are not
+tested. These four criteria are described in the following
+subsections.
+Measure Metric Criterion - This criterion is attached to
+individual Metric objects to decide whether a new metric value
+should be measured or not. This is most useful in the case where it
+is expensive to measure a particular metric. Furthermore, this
+criterion can be used as a mechanism for limiting storage
+requirements and manipulation overhead in the case where metric
+history is maintained. Simple examples would be either time or
+frequency based whereas more complex criteria could be domain
+specific for a particular metric, or based upon information stored
+in the metrics history.
+Notify Metrics Container Criterion - This criterion is also
+attached to individual Metric objects and is used to determine
+the circumstances under which the Metric object should notify its
+MetricsContainer. This is based on the assumption that
+there may be cases where it is desirable to measure and store a
+metric in the history for the analysis of temporal behaviour, but is
+not yet significant enough to notify the MetricsContainer
+for further processing.
+A simple example of this criterion would be threshold based
+in which the newest metric value is compared with the previously
+stored value to determine whether the difference is significant
+enough to be of any interest to the MetricsContainer. A
+more complex criterion could involve analysis of the history to
+determine whether a pattern of recent changes is significant
+enough to warrant further processing and possible metrics
+delivery.
+Notify Model Entity Criterion - Unlike the previous two
+criteria, this criterion is associated with a MetricsContainer.
+Since a MetricsContainer can have multiple Metric
+objects, of which it has explicit domain knowledge, it is able to
+determine if, when, and how many of these metrics should be
+propagated to the ModelEntity and thus become candidates
+for being part of the hierarchical ModelEntity push process as
+described below. This decision making is facilitated by the
+notifications received from individual Metric objects as
+described above.
+A simple implementation would be waiting for a certain
+number of updates before sending a notification to the model
+entity. For example, since the MobjectMetricsContainer
+object contains three metrics, a possible criteria would be to check
+if two or more of the metrics have changed. A slightly more
+advanced implementation can be done by giving each metric a
+weight to indicate how significant it is in the adaptation decision
+making process.
+Push Criterion - The push criterion applies to all of the
+ModelEntites which are containers, that is the
+TransportManagerModelEntity,
+RuntimeModelEntity and ServiceModelEntity, as
+well as the special case of the ProxyMetricsContainer.
+The purpose of this criterion is twofold. For the
+TransportManagerModelEntity this serves as a criterion
+to determine notification since as with the previously described
+criteria, a local reference is involved. For the other model entities,
+this serves as an opportunity to determine both when and what
+metrics should be pushed to the parent container wherein the case
+of the ServiceModelEntity the parent is the adaptation
+engine itself or in the case of the ProxyMetricsContainer
+the target of the push is the MobjectMetricsContainer.
+Furthermore, this criterion is evaluated using information
+from two sources. Firstly, it responds to the notification received
+from its own MetricsContainer but more importantly it
+serves to keep track of notifications from its child
+ModelEntities so as to determine when and what metrics
+information should be pushed to its parent or target. In the
+specialised case of the push criterion for the proxy, the decision
+making is based on both the ProxyMetricsContainer itself,
+as well as the information accumulated from the individual
+ProxyMethodMetricsContainers. Note that a push criterion
+is not required for a mobject since it does not have any
+containment or aggregating responsibilities since this is already
+Service
+Model
+Entity
+Service
+Metrics
+Container
+Notify Model
+Entity Criterion
+Runtime
+Model
+Entity
+Runtime
+Metrics
+Container
+Notify Model
+Entity Criterion
+Transport
+Manager
+Model
+Entity
+Transport
+Manager
+Metrics
+Container
+Notify Model
+Entity Criterion
+Push
+Criterion
+Mobject
+Model
+Entity
+Mobject
+Method
+Metrics
+Notify Model
+Entity Criterion
+Push
+Criterion
+Push
+Criterion
+To adaptation
+engine
+Mobject
+Metrics
+Container
+Notify Metrics
+Container
+Criterion
+Measure
+Metric
+Criterion
+Metric 1
+NotifyMetrics
+Container
+Criterion
+Notify Metrics
+Container
+Criterion
+Measure Metric
+CriterionProxyMethod
+Metrics
+Containers
+RT Metric
+Notify Metrics
+Container
+Criterion
+ProxyMetrics
+Container
+Push
+Criterion
+Measure
+Metric
+Criterion
+Metric 2
+Measure Metric
+Criterion
+Metric 1
+1..n
+not currently implemented
+Notify Metrics
+Container
+Criterion
+Metric 1
+Metric 2
+Measure
+Metric
+Criterion
+Measure
+Metric
+Criterion
+Notify Metrics
+Container
+Criterion
+MU Metric
+Measure
+Metric
+Criterion
+Notify Metrics
+Container
+Criterion
+ET Metric
+IT Metric
+NI Metric
+Measure
+Metric
+Criterion
+Measure
+Metric
+Criterion
+Measure
+Metric
+Criterion
+Notify Metrics
+Container
+Criterion NU Metric
+PU Metric
+Measure
+Metric
+Criterion
+Measure
+Metric
+Criterion
+1..n
+Figure 1. Structural overview of the hierarchical and 
+criteriabased notification relationships between Metrics, Metrics
+Containers, and Model Entities
+handled by the MobjectMetricsContainer and its
+individual MobjectMethodMetricsContainers.
+Although it is always important to reduce the number of
+pushes, this is especially so from a service to a centralised global
+adaptation engine, or from a proxy to a mobject. This is because
+these relationships involve a remote call [18] which is expensive
+due to connection setup and data marshalling and unmarshalling
+overhead, and thus it is more efficient to send a given amount of
+data in aggregate form rather than sending smaller chunks
+multiple times.
+A simple implementation for reducing the number of pushes
+can be done using the concept of a process period [19] in which
+case the model entity accumulates pushes from its child entities
+until the process period expires at which time it pushes the
+accumulated metrics to its parent. Alternatively it could be based
+on frequency using domain knowledge about the type of children
+for example when a significant number of mobjects in a particular
+application (i.e. TransportManager) have undergone
+substantial changes.
+For reducing the size of pushed data, two types of pushes
+were considered: shallow push and deep push. With shallow push,
+a list of metrics containers that contain updated metrics is pushed.
+In a deep push, the model entity itself is pushed, along with its
+metrics container and its child entities, which also have reference
+to metrics containers but possibly unchanged metrics. In the case
+of the proxy, a deep push involves pushing the
+ProxyMetricsContainer and all of the
+ProxyMethodMetricsContainers whereas a shallow push
+means only the ProxyMethodMetricsContainers that
+meet a certain criterion.
+4. EVALUATION
+The preliminary tests presented in this section aim to analyse
+the performance and scalability of the solution and evaluate the
+impact on application execution in terms of metrics collection
+overhead. All tests were executed using two Pentium 4 3.0 GHz
+PCs with 1,024 MB of RAM, running Java 1.4.2_08. The two
+machines were connected to a router with a third computer acting
+as a file server and hosting the external adaptation engine
+implemented within the MobJeX system controller, thereby
+simulating a global adaptation scenario.
+Since only a limited number of tests could be executed, this
+evaluation chose to measure the worst case scenario in which all
+metrics collection was initiated in mobjects, wherein the
+propagation cost is higher than for any other metrics collected in
+the system. In addition, since exhaustive testing of criteria is
+beyond the scope of this paper, two different types of criteria were
+used in the tests. The measure metrics criterion was chosen, since
+this represents the starting point of the measurement process and
+can control under what circumstances and how frequently metrics
+are measured. In addition, the push criterion was also
+implemented on the service, in order to provide an evaluation of
+controlling the frequency of metrics delivery to the adaptation
+engine. All other (update and push) criteria were set to always
+meaning that they always evaluated to true and thus a notification
+was posted.
+Figure 2 shows the metric collection overhead in the mobject
+(MMCO), for different numbers of mobjects and methods when
+all criteria are set to always to provide the maximum measurement
+and propagation of metrics and thus an absolute worst case
+performance scenario. It can be seen that the independent factors
+of increasing the number of mobjects and methods independently
+are linear. Although combining these together provides an
+exponential growth that is approximately n-squared, the initial
+results are not discouraging since delivering all of the metrics
+associated with 20 mobjects, each having 20 methods (which
+constitutes quite a large application given that mobjects typically
+represent coarse grained object clusters) is approximately 400ms,
+which could reasonably be expected to be offset with adaptation
+gains. Note that in contrast, the proxy metrics collection overhead
+(PMCO) was relatively small and constant at < 5ms, since in the
+absence of a proxy push criterion (this was only implemented on
+the service) the response time (RT) data for a single method is
+pushed during every invocation.
+50
+150
+250
+350
+450
+550
+1 5 10 15 20 25
+Number of Mobjects/Methods
+MobjectMetricsCollectionOverheadMMCO(ms)
+Methods
+Mobjects
+Both
+Figure 2. Worst case performance characteristics
+The next step was to determine the percentage metrics
+collection overhead compared with execution time in order to
+provide information about the execution characteristics of objects
+that would be suitable for adaptation using this metric collection
+approach. Clearly, it is not practical to measure metrics and
+perform adaptation on objects with short execution times that
+cannot benefit from remote execution on hosts with greater
+processing power, thereby offsetting IT overhead of remote
+compared with local execution as well as the cost of object
+migration and the metrics collection process itself.
+In addition, to demonstrate the effect of using simple
+frequency based criteria, the MMCO results as a percentage of
+method execution time were plotted as a 3-dimensional graph in
+Figure 3 with the z-axis representing the frequency used in both
+the measure metrics criterion and the service to adaptation engine
+push criterion. This means that for a frequency value of 5 (n=5),
+metrics are only measured on every fifth method call, which then
+results in a notification through the model entity hierarchy to the
+service, on this same fifth invocation. Furthermore, the value of
+n=5 was also applied to the service push criterion so that metrics
+were only pushed to the adaptation engine after five such
+notifications, that is for example five different mobjects had
+updated their metrics.
+These results are encouraging since even for the worst case
+scenario of n=1 the metric collection overhead is an acceptable
+20% for a method of 1500ms duration (which is relatively short
+for a component or service level object in a distributed enterprise
+class application) with previous work on adaptation showing that
+such an overhead could easily be recovered by the efficiency gains
+made by adaptation [5]. Furthermore, the measurement time
+includes delivering the results synchronously via a remote call to
+the adaptation engine on a different host, which would normally
+be done asynchronously, thus further reducing the impact on
+method execution performance. The graph also demonstrates that
+even using modest criteria to reduce the metrics measurement to
+more realistic levels, has a rapid improvement on collection
+overhead at 20% for 500ms of ET.
+0
+1000
+2000
+3000
+4000
+5000
+1
+2
+3
+4
+5
+6
+0
+20
+40
+60
+80
+100
+120
+MMCO (%)
+ET (milliseconds) N (interval)
+MMCO (%)
+Figure 3. Performance characteristics with simple criteria
+5. SUMMARY AND CONCLUSIONS
+Given the challenges of developing mobile applications that
+run in dynamic/heterogeneous environments, and the subsequent
+interest in application adaptation, this paper has proposed and
+implemented an online metrics collection strategy to assist such
+adaptation using a mobile object framework and supporting
+middleware.
+Controlled lab studies were conducted to determine worst case
+performance, as well as show the reduction in collection overhead
+when applying simple collection criteria. In addition, further
+testing provided an initial indication of the characteristics of
+application objects (based on method execution time) that would
+be good candidates for adaptation using the worst case
+implementation of the proposed metrics collection strategy.
+A key feature of the solution was the specification of multiple
+configurable criteria to control the propagation of metrics through
+the system, thereby reducing collection overhead. While the
+potentially efficacy of this approach was tested using simple
+criteria, given the flexibility of the approach we believe there are
+many opportunities to significantly reduce collection overhead
+through the use of more sophisticated criteria. One such approach
+could be based on maintaining metrics history in order to
+determine the temporal behaviour of metrics and thus make more
+intelligent and conservative decisions regarding whether a change
+in a particular metric is likely to be of interest to the adaptation
+engine and should thus serve as a basis for notification for
+inclusion in the next metrics push. Furthermore, such a temporal
+history could also facilitate intelligent decisions regarding the
+collection of metrics since for example a metric that is known to
+be largely constant need not be frequently measured.
+Future work will also involve the evaluation of a broad range
+of adaptation scenarios on the MobJeX framework to quantity the
+gains that can be made via adaptation through object mobility and
+thus demonstrate in practise, the efficacy of the solution described
+in this paper. Finally, the authors wish to explore applying the
+metrics collection concepts described in this paper to a more
+general and reusable context management system [20].
+6. REFERENCES
+1. Katz, R.H., Adaptation and Mobility in Wireless Information
+Systems. IEEE Personal Communications, 1994. 1: p. 6-17.
+2. Hirschfeld, R. and Kawamura, K. Dynamic Service Adaptation.
+in ICDCS Workshops"04. 2004.
+3. Lemlouma, T. and Layaida, N. Context-Aware Adaptation for
+Mobile Devices. in Proceedings of IEEE International
+Conference on Mobile Data Management 2004. 2004.
+4. Noble, B.D., et al. Agile Application-Aware Adaptation for
+Mobility. in Proc. of the 16th ACM Symposium on Operating
+Systems and Principles SOSP. 1997. Saint-Malo, France.
+5. Rossi, P. and Ryan, C. An Empirical Evaluation of Dynamic
+Local Adaptation for Distributed Mobile Applications. in Proc.
+of 2005 International Symposium on Distributed Objects and
+Applications (DOA 2005). 2005. Larnaca, Cyprus: 
+SpringerVerlag.
+6. Ryan, C. and Westhorpe, C. Application Adaptation through
+Transparent and Portable Object Mobility in Java. in
+International Symposium on Distributed Objects and
+Applications (DOA 2004). 2004. Larnaca, Cyprus: 
+SpringerVerlag.
+7. da Silva e Silva, F.J., Endler, M., and Kon, F. Developing
+Adaptive Distributed Applications: A Framework Overview and
+Experimental Results. in On The Move to Meaningful Internet
+Systems 2003: CoopIS, DOA, and ODBASE (LNCS 2888). 2003.
+8. Rossi, P. and Fernandez, G. Definition and validation of design
+metrics for distributed applications. in Ninth International
+Software Metrics Symposium. 2003. Sydney: IEEE.
+9. Ryan, C. and Rossi, P. Software, Performance and Resource
+Utilisation Metrics for Context Aware Mobile Applications. in
+Proceedings of International Software Metrics Symposium IEEE
+Metrics 2005. 2005. Como, Italy.
+10. Recursion Software Inc. Voyager URL:
+http://www.recursionsw.com/voyager.htm. 2005.
+11. Holder, O., Ben-Shaul, I., and Gazit, H., System Support for
+Dynamic Layout of Distributed Applications. 1998, 
+TechinonIsrael Institute of Technology. p. 163 - 173.
+12. Holder, O., Ben-Shaul, I., and Gazit, H. Dynamic Layout of
+Distributed Applications in FarGo. in 21st Int'l Conf. Software
+Engineering (ICSE'99). 1999: ACM Press.
+13. Philippsen, M. and Zenger, M., JavaParty - Transparent Remote
+Objects in Java. Concurrency: Practice and Experience, 1997.
+9(11): p. 1225-1242.
+14. Shapiro, M. Structure and Encapsulation in Distributed Systems:
+the Proxy Principle. in Proc.6th Intl. Conference on Distributed
+Computing Systems. 1986. Cambridge, Mass. (USA): IEEE.
+15. Gazit, H., Ben-Shaul, I., and Holder, O. Monitoring-Based
+Dynamic Relocation of Components in Fargo. in Proceedings of
+the Second International Symposium on Agent Systems and
+Applications and Fourth International Symposium on Mobile
+Agents. 2000.
+16. Lindholm, T. and Yellin, F., The Java Virtual Machine
+Specification 2nd Edition. 1999: Addison-Wesley.
+17. Randell, L.G., Holst, L.G., and Bolmsjö, G.S. Incremental System
+Development of Large Discrete-Event Simulation Models. in
+Proceedings of the 31st conference on Winter Simulation. 1999.
+Phoenix, Arizona.
+18. Waldo, J., Remote Procedure Calls and Java Remote Method
+Invocation. IEEE Concurrency, 1998. 6(3): p. 5-7.
+19. Rolia, J. and Lin, B. Consistency Issues in Distributed
+Application Performance Metrics. in Proceedings of the 1994
+Conference of the Centre for Advanced Studies on Collaborative
+Research. 1994. Toronto, Canada.
+20. Henricksen, K. and Indulska, J. A software engineering
+framework for context-aware pervasive computing. in
+Proceedings of the 2nd IEEE Conference on Pervasive
+Computing and Communications (PerCom). 2004. Orlando.

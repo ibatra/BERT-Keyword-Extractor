@@ -1,0 +1,1176 @@
+Multi-Attribute Coalitional Games∗
+Samuel Ieong
+†
+Computer Science Department
+Stanford University
+Stanford, CA 94305
+sieong@cs.stanford.edu
+Yoav Shoham
+Computer Science Department
+Stanford University
+Stanford, CA 94305
+shoham@cs.stanford.edu
+ABSTRACT
+We study coalitional games where the value of cooperation
+among the agents are solely determined by the attributes
+the agents possess, with no assumption as to how these 
+attributes jointly determine this value. This framework 
+allows us to model diverse economic interactions by picking
+the right attributes. We study the computational 
+complexity of two coalitional solution concepts for these 
+gamesthe Shapley value and the core. We show how the positive
+results obtained in this paper imply comparable results for
+other games studied in the literature.
+Categories and Subject Descriptors
+I.2.11 [Distributed Artificial Intelligence]: Multiagent
+systems; J.4 [Social and Behavioral Sciences]: 
+Economics; F.2 [Analysis of Algorithms and Problem 
+Complexity]
+General Terms
+Algorithms, Economics
+1. INTRODUCTION
+When agents interact with one another, the value of their
+contribution is determined by what they can do with their
+skills and resources, rather than simply their identities. 
+Consider the problem of forming a soccer team. For a team to
+be successful, a team needs some forwards, midfielders, 
+defenders, and a goalkeeper. The relevant attributes of the
+players are their skills at playing each of the four positions.
+The value of a team depends on how well its players can play
+these positions. At a finer level, we can extend the model
+to consider a wider range of skills, such as passing, 
+shooting, and tackling, but the value of a team remains solely a
+function of the attributes of its players.
+Consider an example from the business world. 
+Companies in the metals industry are usually vertically-integrated
+and diversified. They have mines for various types of ores,
+and also mills capable of processing and producing 
+different kinds of metal. They optimize their production profile
+according to the market prices for their products. For 
+example, when the price of aluminum goes up, they will 
+allocate more resources to producing aluminum. However, each
+company is limited by the amount of ores it has, and its
+capacities in processing given kinds of ores. Two or more
+companies may benefit from trading ores and processing 
+capacities with one another. To model the metal industry, the
+relevant attributes are the amount of ores and the 
+processing capacities of the companies. Given the exogenous input
+of market prices, the value of a group of companies will be
+determined by these attributes.
+Many real-world problems can be likewise modeled by
+picking the right attributes. As attributes apply to both
+individual agents and groups of agents, we propose the use
+of coalitional game theory to understand what groups may
+form and what payoffs the agents may expect in such models.
+Coalitional game theory focuses on what groups of agents
+can achieve, and thus connects strongly with e-commerce,
+as the Internet economies have significantly enhanced the
+abilities of business to identify and capitalize on profitable
+opportunities of cooperation. Our goal is to understand
+the computational aspects of computing the solution 
+concepts (stable and/or fair distribution of payoffs, formally
+defined in Section 3) for coalitional games described using
+attributes. Our contributions can be summarized as follows:
+• We define a formal representation for coalitional games
+based on attributes, and relate this representation to
+others proposed in the literature. We show that when
+compared to other representations, there exists games
+for which a multi-attribute description can be 
+exponentially more succinct, and for no game it is worse.
+• Given the generality of the model, positive results carry
+over to other representations. We discuss two positive
+results in the paper, one for the Shapley value and one
+for the core, and show how these imply related results
+in the literature.
+170
+• We study an approximation heuristic for the Shapley
+value when its exact values cannot be found efficiently.
+We provide an explicit bound on the maximum error
+of the estimate, and show that the bound is 
+asymptotically tight. We also carry out experiments to evaluate
+how the heuristic performs on random instances.1
+2. RELATED WORK
+Coalitional game theory has been well studied in 
+economics [9, 10, 14]. A vast amount of literature have focused
+on defining and comparing solution concepts, and 
+determining their existence and properties. The first algorithmic
+study of coalitional games, as far as we know, is performed
+by Deng and Papadimitriou in [5]. They consider coalitional
+games defined on graphs, where the players are the vertices
+and the value of coalition is determined by the sum of the
+weights of the edges spanned by these players. This can be
+efficiently modeled and generalized using attributes.
+As a formal representation, multi-attribute coalitional games
+is closely related to the multi-issue representation of Conitzer
+and Sandholm [3] and our work on marginal contribution
+networks [7]. Both of these representations are based on
+dividing a coalitional game into subgames (termed issues
+in [3] and rules in [7]), and aggregating the subgames via
+linear combination. The key difference in our work is the
+unrestricted aggregation of subgames: the aggregation could
+be via a polynomial function of the attributes, or even by
+treating the subgames as input to another computational
+problem such as a min-cost flow problem. The relationship
+of these models will be made clear after we define the 
+multiattribute representation in Section 4.
+Another representation proposed in the literature is one
+specialized for superadditive games by Conitzer and 
+Sandholm [2]. This representation is succinct, but to find the
+values of some coalitions may require solving an NP-hard
+problem. While it is possible for multi-attribute coalitional
+games to efficiently represent these games, it necessarily 
+requires the solution to an NP-hard problem in order to find
+out the values of some coalitions. In this paper, we stay
+within the boundary of games that admits efficient 
+algorithm for determining the value of coalitions. We will 
+therefore not make further comparisons with [2].
+The model of coalitional games with attributes has been
+considered in the works of Shehory and Kraus. They model
+the agents as possessing capabilities that indicates their 
+proficiencies in different areas, and consider how to efficiently
+allocate tasks [12] and the dynamics of coalition formation
+[13]. Our work differs significantly as our focus is on 
+reasoning about solution concepts. Our model also covers a wider
+scope as attributes generalize the notion of capabilities.
+Yokoo et al. have also considered a model of coalitional
+games where agents are modeled by sets of skills, and these
+skills in turn determine the value of coalitions [15]. There are
+two major differences between their work and ours. Firstly,
+Yokoo et al. assume that each skill is fundamentally different
+from another, hence no two agents may possess the same
+skill. Also, they focus on developing new solution concepts
+that are robust with respect to manipulation by agents. Our
+focus is on reasoning about traditional solution concepts.
+1
+We acknowledge that random instances may not be typical
+of what happens in practice, but given the generality of our
+model, it provides the most unbiased view.
+Our work is also related to the study of cooperative games
+with committee control [4]. In these games, there is usually
+an underlying set of resources each controlled by a 
+(possibly overlapping) set of players known as the committee,
+engaged in a simple game (defined in Section 3). 
+multiattribute coalitional games generalize these by considering
+relationship between the committee and the resources 
+beyond simple games. We note that when restricted to simple
+games, we derive similar results to that in [4].
+3. PRELIMINARIES
+In this section, we will review the relevant concepts of
+coalitional game theory and its two most important solution
+concepts - the Shapley value and the core. We will then
+define the computational questions that will be studied in
+the second half of the paper.
+3.1 Coalitional Games
+Throughout this paper, we assume that payoffs to groups
+of agents can be freely distributed among its members. This
+transferable utility assumption is commonly made in 
+coalitional game theory. The canonical representation of a 
+coalitional game with transferable utility is its characteristic form.
+Definition 1. A coalition game with transferable utility in
+characteristic form is denoted by the pair N, v , where
+• N is the set of agents; and
+• v : 2N
+→ R is a function that maps each group of
+agents S ⊆ N to a real-valued payoff.
+A group of agents in a game is known as a coalition, and the
+entire set of agents is known as the grand coalition.
+An important class of coalitional games is the class of
+monotonic games.
+Definition 2. A coalitional game is monotonic if for all
+S ⊂ T ⊆ N, v(S) ≤ v(T).
+Another important class of coalitional games is the class
+of simple games. In a simple game, a coalition either wins,
+in which case it has a value of 1, or loses, in which case it
+has a value of 0. It is often used to model voting situations.
+Simple games are often assumed to be monotonic, i.e., if S
+wins, then for all T ⊇ S, T also wins. This coincides with
+the notion of using simple games as a model for voting. If a
+simple game is monotonic, then it is fully described by the
+set of minimal winning coalitions, i.e., coalitions S for which
+v(S) = 1 but for all coalitions T ⊂ S, v(T) = 0.
+An outcome in a coalitional game specifies the utilities
+the agents receive. A solution concept assigns to each 
+coalitional game a set of reasonable outcomes. Different 
+solution concepts attempt to capture in some way outcomes
+that are stable and/or fair. Two of the best known solution
+concepts are the Shapley value and the core.
+The Shapley value is a normative solution concept that
+prescribes a fair way to divide the gains from cooperation
+when the grand coalition is formed. The division of payoff
+to agent i is the average marginal contribution of agent i
+over all possible permutations of the agents. Formally,
+Definition 3. The Shapley value of agent i, φi(v), in game
+N, v is given by the following formula
+φi(v) =
+S⊆N\{i}
+|S|!(|N| − |S| − 1)!
+|N|!
+(v(S ∪ {i}) − v(S))
+171
+The core is a descriptive solution concept that focuses on
+outcomes that are stable. Stability under core means that
+no set of players can jointly deviate to improve their payoffs.
+Definition 4. An outcome x ∈ R|N|
+is in the core of the
+game N, v if for all S ⊆ N,
+i∈S
+xi ≥ v(S)
+Note that the core of a game may be empty, i.e., there may
+not exist any payoff vector that satisfies the stability 
+requirement for the given game.
+3.2 Computational Problems
+We will study the following three problems related to 
+solution concepts in coalitional games.
+Problem 1. (Shapley Value) Given a description of the
+coalitional game and an agent i, compute the Shapley value
+of agent i.
+Problem 2. (Core Membership) Given a description of
+the coalitional game and a payoff vector x such that
+È
+i∈N xi =
+v(N), determine if
+È
+i∈S xi ≥ v(S) for all S ⊆ N.
+Problem 3. (Core Non-emptiness) Given a description
+of the coalitional game, determine if there exists any payoff
+vector x such that
+È
+i∈S xi ≥ V (S) for all S ⊆ N, andÈ
+i∈N xi = v(N).
+Note that the complexity of the above problems depends
+on the how the game is described. All these problems will
+be easy if the game is described by its characteristic form,
+but only so because the description takes space 
+exponential in the number of agents, and hence simple brute-force
+approach takes time polynomial to the input description.
+To properly understand the computational complexity 
+questions, we have to look at compact representation.
+4. FORMAL MODEL
+In this section, we will give a formal definition of 
+multiattribute coalitional games, and show how it is related to
+some of the representations discussed in the literature. We
+will also discuss some limitations to our proposed approach.
+4.1 Multi-Attribute Coalitional Games
+A multi-attribute coalitional game (MACG) consists of
+two parts: a description of the attributes of the agents,
+which we termed an attribute model, and a function that
+assigns values to combination of attributes. Together, they
+induce a coalitional game over the agents. We first define
+the attribute model.
+Definition 5. An attribute model is a tuple N, M, A , where
+• N denotes the set of agents, of size n;
+• M denotes the set of attributes, of size m;
+• A ∈ Rm×n
+, the attribute matrix, describes the values
+of the attributes of the agents, with Aij denoting the
+value of attribute i for agent j.
+We can directly define a function that maps combinations
+of attributes to real values. However, for many problems,
+we can describe the function more compactly by computing
+it in two steps: we first compute an aggregate value for
+each attribute, then compute the values of combination of
+attributes using only the aggregated information. Formally,
+Definition 6. An aggregating function (or aggregator) takes
+as input a row of the attribute matrix and a coalition S, and
+summarizes the attributes of the agents in S with a single
+number. We can treat it as a mapping from Rn
+× 2N
+→ R.
+Aggregators often perform basic arithmetic or logical 
+operations. For example, it may compute the sum of the 
+attributes, or evaluate a Boolean expression by treating the
+agents i ∈ S as true and j /∈ S as false. Analogous to the
+notion of simple games, we call an aggregator simple if its
+range is {0, 1}. For any aggregator, there is a set of relevant
+agents, and a set of irrelevant agents. An agent i is 
+irrelevant to aggregator aj
+if aj
+(S ∪ {i}) = aj
+(S) for all S ⊆ N.
+A relevant agent is one not irrelevant.
+Given the attribute matrix, an aggregator assigns a value
+to each coalition S ⊆ N. Thus, each aggregator defines a
+game over N. For aggregator aj
+, we refer to this induced
+game as the game of attribute j, and denote it with aj
+(A).
+When the attribute matrix is clear from the context, we may
+drop A and simply denote the game as aj
+. We may refer to
+the game as the aggregator when no ambiguities arise.
+We now define the second step of the computation with
+the help of aggregators.
+Definition 7. An aggregate value function takes as input
+the values of the aggregators and maps these to a real value.
+In this paper, we will focus on having one aggregator per
+attribute. Therefore, in what follows, we will refer to the
+aggregate value function as a function over the attributes.
+Note that when all aggregators are simple, the aggregate
+value function implicitly defines a game over the attributes,
+as it assigns a value to each set of attributes T ⊆ M. We
+refer to this as the game among attributes.
+We now define multi-attribute coalitional game.
+Definition 8. A multi-attribute coalitional game is defined
+by the tuple N, M, A, a, w , where
+• N, M, A is an attribute model;
+• a is a set of aggregators, one for each attribute; we can
+treat the set together as a vector function, mapping
+Rm×n
+× 2N
+→ Rm
+• w : Rm
+→ R is an aggregate value function.
+This induces a coalitional game with transferable payoffs
+N, v with players N and the value function defined by
+v(S) = w(a(A, S))
+Note that MACG as defined is fully capable of 
+representing any coalitional game N, v . We can simply take the set
+of attributes as equal to the set of agents, i.e., M = N, an
+identity matrix for A, aggregators of sums, and the 
+aggregate value function w to be v.
+172
+4.2 An Example
+Let us illustrate how MACG can be used to represent a
+game with a simple example. Suppose there are four types
+of resources in the world: gold, silver, copper, and iron, that
+each agent is endowed with some amount of these resources,
+and there is a fixed price for each of the resources in the
+market. This game can be described using MACG with an
+attribute matrix A, where Aij denote the amount of resource
+i that agent j is endowed. For each resource, the 
+aggregator sums together the amount of resources the agents have.
+Finally, the aggregate value function takes the dot product
+between the market price vector and the aggregate vector.
+Note the inherent flexibility in the model: only limited
+work would be required to update the game as the market
+price changes, or when a new agent arrives.
+4.3 Relationship with Other Representations
+As briefly discussed in Section 2, MACG is closely related
+to two other representations in the literature, the 
+multiissue representation of Conitzer and Sandholm [3], and our
+work on marginal contribution nets [7]. To make their 
+relationships clear, we first review these two representations.
+We have changed the notations from the original papers to
+highlight their similarities.
+Definition 9. A multi-issue representation is given as a
+vector of coalitional games, (v1, v2, . . . vm), each possibly
+with a varying set of agents, say N1, . . . , Nm. The 
+coalitional game N, v induced by multi-issue representation has
+player set N =
+Ëm
+i=1 Ni, and for each coalition S ⊆ N,
+v(S) =
+Èm
+i=1 v(S ∩ Ni). The games vi are assumed to be
+represented in characteristic form.
+Definition 10. A marginal contribution net is given as a
+set of rules (r1, r2, . . . , rm), where rule ri has a weight wi,
+and a pattern pi that is a conjunction over literals 
+(positive or negative). The agents are represented as literals. A
+coalition S is said to satisfy the pattern pi, if we treat the
+agents i ∈ S as true, an agent j /∈ S as false, pi(S) 
+evaluates to true. Denote the set of literals involved in rule i
+by Ni. The coalitional game N, v induced by a marginal
+contribution net has player set N =
+Ëm
+i=1 Ni, and for each
+coalition S ⊆ N, v(S) =
+È
+i:pi(S)=true wi.
+From these definitions, we can see the relationships among
+these three representations clearly. An issue of a multi-issue
+representation corresponds to an attribute in MACG. 
+Similarly, a rule of a marginal contribution net corresponds to
+an attribute in MACG. The aggregate value functions are
+simple sums and weighted sums for the respective 
+representations. Therefore, it is clear that MACG will be no less
+succinct than either representation.
+However, MACG differs in two important way. Firstly,
+there is no restriction on the operations performed by the
+aggregate value function over the attributes. This is an 
+important generalization over the linear combination of issues
+or rules in the other two approaches. In particular, there are
+games for which MACG can be exponentially more compact.
+The proof of the following proposition can be found in the
+Appendix.
+Proposition 1. Consider the parity game N, v where
+coalition S ⊆ N has value v(S) = 1 if |S| is odd, and v(S) =
+0 otherwise. MACG can represent the game in O(n) space.
+Both multi-issue representation and marginal contribution
+nets requires O(2n
+) space.
+A second important difference of MACG is that the 
+attribute model and the value function is cleanly separated.
+As suggested in the example in Section 4.2, this often 
+allows us more efficient update of the values of the game as it
+changes. Also, the same attribute model can be evaluated
+using different value functions, and the same value function
+can be used to evaluate different attribute model. Therefore,
+MACG is very suitable for representing multiple games. We
+believe the problems of updating games and representing
+multiple games are interesting future directions to explore.
+4.4 Limitation of One Aggregator per Attribute
+Before focusing on one aggregator per attribute for the
+rest of the paper, it is natural to wonder if any is lost per
+such restriction. The unfortunate answer is yes, best 
+illustrated by the following. Consider again the problem of
+forming a soccer team discussed in the introduction, where
+we model the attributes of the agents as their ability to take
+the four positions of the field, and the value of a team 
+depends on the positions covered. If we first aggregate each
+of the attribute individually, we will lose the distributional
+information of the attributes. In other words, we will not
+be able to distinguish between two teams, one of which has
+a player for each position, the other has one player who can
+play all positions, but the rest can only play the same one
+position.
+This loss of distributional information can be recovered
+by using aggregators that take as input multiple rows of
+the attribute matrix rather than just a single row. 
+Alternatively, if we leave such attributes untouched, we can leave
+the burden of correctly evaluating these attributes to the 
+aggregate value function. However, for many problems that we
+found in the literature, such as the transportation domain
+of [12] and the flow game setting of [4], the distribution of
+attributes does not affect the value of the coalitions. In 
+addition, the problem may become unmanageably complex as
+we introduce more complicated aggregators. Therefore, we
+will focus on the representation as defined in Definition 8.
+5. SHAPLEY VALUE
+In this section, we focus on computational issues of 
+finding the Shapley value of a player in MACG. We first set
+up the problem with the use of oracles to avoid 
+complexities arising from the aggregators. We then show that when
+attributes are linearly separable, the Shapley value can be
+efficiently computed. This generalizes the proofs of related
+results in the literature. For the non-linearly separable case,
+we consider a natural heuristic for estimating the Shapley
+value, and study the heuristic theoretically and empirically.
+5.1 Problem Setup
+We start by noting that computing the Shapley value for
+simple aggregators can be hard in general. In particular, we
+can define aggregators to compute weighted majority over
+its input set of agents. As noted in [6], finding the Shapley
+value of a weighted majority game is #P-hard. Therefore,
+discussion of complexity of Shapley value for MACG with
+unrestricted aggregators is moot.
+Instead of placing explicit restriction on the aggregator,
+we assume that the Shapley value of the aggregator can be
+173
+answered by an oracle. For notation, let φi(u) denote the
+Shapley value for some game u. We make the following
+assumption:
+Assumption 1. For each aggregator aj
+in a MACG, there
+is an associated oracle that answers the Shapley value of the
+game of attribute j. In other words, φi(aj
+) is known.
+For many aggregators that perform basic operations over
+its input, polynomial time oracle for Shapley value exists.
+This include operations such as sum, and symmetric 
+functions when the attributes are restricted to {0, 1}. Also, when
+only few agents have an effect on the aggregator, brute-force
+computation for Shapley value is feasible. Therefore, the
+above assumption is reasonable for many settings. In any
+case, such abstraction allows us to focus on the aggregate
+value function.
+5.2 Linearly Separable Attributes
+When the aggregate value function can be written as a
+linear function of the attributes, the Shapley value of the
+game can be efficiently computed.
+Theorem 1. Given a game N, v represented as a MACG
+N, M, A, a, w , if the aggregate value function can be 
+written as a linear function of its attributes, i.e.,
+w(a(A, S)) =
+m
+j=1
+cj aj
+(A, S)
+The Shapley value of agent i in N, v is given by
+φi(v) =
+m
+j=1
+cj φi(aj
+) (1)
+Proof. First, we note that Shapley value satisfies an 
+additivity axiom [11].
+The Shapley value satisfies additivity, namely,
+φi(a + b) = φi(a) + φi(b), where N, a + b is
+a game defined to be (a + b)(S) = a(S) + b(S)
+for all S ⊆ N.
+It is also clear that Shapley value satisfies scaling, namely
+φi(αv) = αφi(v)
+where (αv)(S) = αv(S) for all S ⊆ N.
+Since the aggregate value function can be expressed as a
+weighted sum of games of attributes,
+φi(v) = φi(w(a)) = φi(
+m
+j=1
+cjaj
+) =
+m
+j=1
+cjφi(aj
+)
+Many positive results regarding efficient computation of
+Shapley value in the literature depends on some form of 
+linearity. Examples include the edge-spanning game on graphs
+by Deng and Papadimitriou [5], the multi-issue 
+representation of [3], and the marginal contribution nets of [7]. The
+key to determine if the Shapley value can be efficiently 
+computed depends on the linear separability of attributes. Once
+this is satisfied, as long as the Shapley value of the game of
+attributes can be efficiently determined, the Shapley value
+of the entire game can be efficiently computed.
+Corollary 1. The Shapley value for the edge-spanning
+game of [5], games in multi-issue representation [3], and
+games in marginal contribution nets [7], can be computed in
+polynomial time.
+5.3 Polynomial Combination of Attributes
+When the aggregate value function cannot be expressed
+as a linear function of its attributes, computing the Shapley
+value exactly is difficult. Here, we will focus on aggregate
+value function that can be expressed as some polynomial
+of its attributes. If we do not place a limit on the degree
+of the polynomial, and the game N, v is not necessarily
+monotonic, the problem is #P-hard.
+Theorem 2. Computing the Shapley value of a MACG
+N, M, A, a, w , when w can be an arbitrary polynomial of
+the aggregates a, is #P-hard, even when the Shapley value
+of each aggregator can be efficiently computed.
+The proof is via reduction from three-dimensional matching,
+and details can be found in the Appendix.
+Even if we restrict ourselves to monotonic games, and
+non-negative coefficients for the polynomial aggregate value
+function, computing the exact Shapley value can still be
+hard. For example, suppose there are two attributes. All
+agents in some set B ⊆ N possess the first attribute, and all
+agents in some set C ⊆ N possess the second, and B and C
+are disjoint. For a coalition S ⊆ N, the aggregator for the
+first evaluates to 1 if and only if |S ∩ B| ≥ b , and similarly,
+the aggregator for the second evaluates to 1 if and only if
+|S ∩ C| ≥ c . Let the cardinality of the sets B and C be b
+and c. We can verify that the Shapley value of an agent i in
+B equals
+φi =
+1
+b
+b −1
+i=0
+ b
+i
+¡  c
+c −1
+¡
+  b+c
+c +i−1
+¡
+c − c + 1
+b + c − c − i + 1
+The equation corresponds to a weighted sum of probability
+values of hypergeometric random variables. The 
+correspondence with hypergeometric distribution is due to sampling
+without replacement nature of Shapley value. As far as we
+know, there is no close-form formula to evaluate the sum
+above. In addition, as the number of attributes involved
+increases, we move to multi-variate hypergeometric random
+variables, and the number of summands grow exponentially
+in the number of attributes. Therefore, it is highly unlikely
+that the exact Shapley value can be determined efficiently.
+Therefore, we look for approximation.
+5.3.1 Approximation
+First, we need a criteria for evaluating how well an 
+estimate, ˆφ, approximates the true Shapley value, φ. We 
+consider the following three natural criteria:
+• Maximum underestimate: maxi φi/ˆφi
+• Maximum overestimate: maxi
+ˆφi/φi
+• Total variation: 1
+2
+È
+i |φi − ˆφi|, or alternatively
+maxS |
+È
+i∈S φi −
+È
+i∈S
+ˆφi|
+The total variation criterion is more meaningful when we
+normalize the game to having a value of 1 for the grand
+coalition, i.e., v(N) = 1. We can also define additive 
+analogues of the under- and overestimates, especially when the
+games are normalized.
+174
+We will assume for now that the aggregate value 
+function is a polynomial over the attributes with non-negative
+coefficients. We will also assume that the aggregators are
+simple. We will evaluate a specific heuristic that is 
+analogous to Equation (1). Suppose the aggregate function can
+be written as a polynomial with p terms
+w(a(A, S)) =
+p
+j=1
+cj aj(1)
+(A, S)aj(2)
+(A, S) · · · aj(kj )
+(A, S)
+(2)
+For term j, the coefficient of the term is cj , its degree kj ,
+and the attributes involved in the term are j(1), . . . , j(kj ).
+We compute an estimate ˆφ to the Shapley value as
+ˆφi =
+p
+j=1
+kj
+l=1
+cj
+kj
+φi(aj(l)
+) (3)
+The idea behind the estimate is that for each term, we divide
+the value of the term equally among all its attributes. This
+is represented by the factor
+cj
+kj
+. Then for for each attribute
+of an agent, we assign the player a share of value from the
+attribute. This share is determined by the Shapley value
+of the simple game of that attribute. Without considering
+the details of the simple games, this constitutes a fair (but
+blind) rule of sharing.
+5.3.2 Theoretical analysis of heuristic
+We can derive a simple and tight bound for the maximum
+(multiplicative) underestimate of the heuristic estimate.
+Theorem 3. Given a game N, v represented as a MACG
+N, M, A, a, w , suppose w can be expressed as a 
+polynomial function of its attributes (cf Equation (2)). Let K =
+maxjkj, i.e., the maximum degree of the polynomial. Let ˆφ
+denote the estimated Shapley value using Equation (3), and
+φ denote the true Shapley value. For all i ∈ N, φi ≥ K ˆφi.
+Proof. We bound the maximum underestimate 
+term-byterm. Let tj be the j-th term of the polynomial. We note
+that the term can be treated as a game among attributes,
+as it assigns a value to each coalition S ⊆ N. Without loss
+of generality, renumber attributes j(1) through j(kj ) as 1
+through kj.
+tj (S) = cj
+kj
+l=1
+al
+(A, S)
+To make the equations less cluttered, let
+B(N, S) =
+|S|!(|N| − |S| − 1)!
+|N|!
+and for a game a, contribution of agent i to group S : i /∈ S,
+∆i(a, S) = a(S ∪ {i}) − a(S)
+The true Shapley value of the game tj is
+φi(tj) = cj
+S⊆N\{i}
+B(N, S)∆i(tj, S)
+For each coalition S, i /∈ S, ∆i(tj , S) = 1 if and only if for
+at least one attribute, say l∗
+, ∆i(al∗
+, S) = 1. Therefore, if
+we sum over all the attributes, we would have included l∗
+for sure.
+φi(tj) ≤ cj
+kj
+j=1 S⊆N\{i}
+B(N, S)∆i(aj
+, S)
+= kj
+kj
+j=1
+cj
+kj
+φi(aj
+)
+= kj
+ˆφi(T)
+Summing over the terms, we see that the worst case 
+underestimate is by the maximum degree.
+Without loss of generality, since the bound is 
+multiplicative, we can normalize the game to having v(N) = 1. As a
+corollary, because we cannot overestimate any set by more
+than K times, we obtain a bound on the total variation:
+Corollary 2. The total variation between the estimated
+Shapley value and the true Shapley value, for K-degree bounded
+polynomial aggregate value function, is K−1
+K
+.
+We can show that this bound is tight.
+Example 1. Consider a game with n players and K 
+attributes. Let the first (n−1) agents be a member of the first
+(K − 1) attributes, and that the corresponding aggregator
+returns 1 if any one of the first (K − 1) agents is present.
+Let the n-th agent be the sole member of the K-th attribute.
+The estimated Shapley will assign a value of K−1
+K
+1
+n−1
+to the
+first (n − 1) agents and 1
+K
+to the n-th agent. However, the
+true Shapley value of the n-th agent tends to 1 as n → ∞,
+and the total variation approaches K−1
+K
+.
+In general, we cannot bound how much ˆφ may 
+overestimate the true Shapley value. The problem is that ˆφi may
+be non-zero for agent i even though may have no influence
+over the outcome of a game when attributes are multiplied
+together, as illustrated by the following example.
+Example 2. Consider a game with 2 players and 2 
+attributes, and let the first agent be a member of both 
+attributes, and the other agent a member of the second 
+attribute. For a coalition S, the first aggregator evaluates to
+1 if agent 1 ∈ S, and the second aggregator evaluates to 1 if
+both agents are in S. While agent 2 is not a dummy with
+respect to the second attribute, it is a dummy with respect
+to the product of the attributes. Agent 2 will be assigned a
+value of 1
+4
+by the estimate.
+As mentioned, for simple monotonic games, a game is fully
+described by its set of minimal winning coalitions. When
+the simple aggregators are represented as such, it is possible
+to check, in polynomial time, for agents turning dummies
+after attributes are multiplied together. Therefore, we can
+improve the heuristic estimate in this special case.
+5.3.3 Empirical evaluation
+Due to a lack of benchmark problems for coalitional games,
+we have tested the heuristic on random instances. We 
+believe more meaningful results can be obtained when we have
+real instances to test this heuristic on.
+Our experiment is set up as follows. We control three 
+parameters of the experiment: the number of players (6 − 10),
+175
+0
+0.025
+0.05
+0.075
+0.1
+0.125
+0.15
+0.175
+0.2
+6 7 8 9 10
+No. of Players
+TotalVariationDistance
+2
+3
+4
+5
+(a) Effect of Max Degree
+0
+0.025
+0.05
+0.075
+0.1
+0.125
+0.15
+0.175
+0.2
+6 7 8 9 10
+No. of Players
+TotalVariationDistance
+4
+5
+6
+(b) Effect of Number of Attributes
+Figure 1: Experimental results
+the number of attributes (3 − 8), and the maximum degree
+of the polynomial (2 − 5). For each attribute, we randomly
+sample one to three minimal winning coalitions. We then
+randomly generate a polynomial of the desired maximum
+degree with a random number (3 − 12) of terms, each with
+a random positive weight. We normalize each game to have
+v(N) = 1. The results of the experiments are shown in 
+Figure 1. The y-axis of the graphs shows the total variation,
+and the x-axis the number of players. Each datapoint is an
+average of approximately 700 random samples.
+Figure 1(a) explores the effect of the maximum degree
+and the number of players when the number of attributes is
+fixed (at six). As expected, the total variation increases as
+the maximum degree increases. On the other hand, there is
+only a very small increase in error as the number of players
+increases. The error is nowhere near the theoretical 
+worstcase bound of 1
+2
+to 4
+5
+for polynomials of degrees 2 to 5.
+Figure 1(b) explores the effect of the number of attributes
+and the number of players when the maximum degree of the
+polynomial is fixed (at three). We first note that these three
+lines are quite tightly clustered together, suggesting that the
+number of attributes has relatively little effect on the error
+of the estimate. As the number of attributes increases, the
+total variation decreases. We think this is an interesting
+phenomenon. This is probably due to the precise construct
+required for the worst-case bound, and so as more attributes
+are available, we have more diverse terms in the polynomial,
+and the diversity pushes away from the worst-case bound.
+6. CORE-RELATED QUESTIONS
+In this section, we look at the complexity of the two
+computational problems related to the core: Core 
+Nonemptiness and Core Membership. We show that the 
+nonemptiness of core of the game among attributes and the
+cores of the aggregators imply non-emptiness of the core of
+the game induced by the MACG. We also show that there
+appears to be no such general relationship that relates the
+core memberships of the game among attributes, games of
+attributes, and game induced by MACG.
+6.1 Problem Setup
+There are many problems in the literature for which the
+questions of Core Non-emptiness and Core 
+Membership are known to be hard [1]. For example, for the 
+edgespanning game that Deng and Papadimitriou studied [5],
+both of these questions are coNP-complete. As MACG can
+model the edge-spanning game in the same amount of space,
+these hardness results hold for MACG as well.
+As in the case for computing Shapley value, we attempt
+to find a way around the hardness barrier by assuming the
+existence of oracles, and try to build algorithms with these
+oracles. First, we consider the aggregate value function.
+Assumption 2. For a MACG N, M, A, a, w , we assume
+there are oracles that answers the questions of Core 
+Nonemptiness, and Core Membership for the aggregate value
+function w.
+When the aggregate value function is a non-negative linear
+function of its attributes, the core is always non-empty, and
+core membership can be determined efficiently.
+The concept of core for the game among attributes makes
+the most sense when the aggregators are simple games. We
+will further assume that these simple games are monotonic.
+Assumption 3. For a MACG N, M, A, a, w , we assume
+all aggregators are monotonic and simple. We also assume
+there are oracles that answers the questions of Core 
+Nonemptiness, and Core Membership for the aggregators.
+We consider this a mild assumption. Recall that monotonic
+simple games are fully described by their set of minimal 
+winning coalitions (cf Section 3). If the aggregators are 
+represented as such, Core Non-emptiness and Core 
+Membership can be checked in polynomial time. This is due to the
+following well-known result regarding simple games:
+Lemma 1. A simple game N, v has a non-empty core
+if and only if it has a set of veto players, say V , such that
+v(S) = 0 for all S ⊇ V . Further, A payoff vector x is in the
+core if and only if xi = 0 for all i /∈ V .
+6.2 Core Non-emptiness
+There is a strong connection between the non-emptiness
+of the cores of the games among attributes, games of the
+attributes, and the game induced by a MACG.
+Theorem 4. Given a game N, v represented as a MACG
+N, M, A, a, w , if the core of the game among attributes,
+176
+M, w , is non-empty, and the cores of the games of 
+attributes are non-empty, then the core of N, v is non-empty.
+Proof. Let u be an arbitrary payoff vector in the core of
+the game among attributes, M, w . For each attribute j,
+let θj
+be an arbitrary payoff vector in the core of the game
+of attribute j. By Lemma 1, each attribute j must have a
+set of veto players; let this set be denoted by Pj
+. For each
+agent i ∈ N, let yi =
+È
+j ujθj
+i . We claim that this vector y
+is in the core of N, v . Consider any coalition S ⊆ N,
+v(S) = w(a(A, S)) ≤
+j:S⊇P j
+uj (4)
+This is true because an aggregator cannot evaluate to 1 
+without all members of the veto set. For any attribute j, by
+Lemma 1,
+È
+i∈P j θj
+i = 1. Therefore,
+j:S⊇P j
+uj =
+j:S⊇P j
+uj
+i∈P j
+θj
+i
+=
+i∈S j:S⊇P j
+ujθj
+i
+≤
+i∈S
+yi
+Note that the proof is constructive, and hence if we are
+given an element in the core of the game among attributes,
+we can construct an element of the core of the coalitional
+game. From Theorem 4, we can obtain the following 
+corollaries that have been previously shown in the literature.
+Corollary 3. The core of the edge-spanning game of [5]
+is non-empty when the edge weights are non-negative.
+Proof. Let the players be the vertices, and their 
+attributes the edges incident on them. For each attribute,
+there is a veto set - namely, both endpoints of the edges.
+As previously observed, an aggregate value function that is a
+non-negative linear function of its aggregates has non-empty
+core. Therefore, the precondition of Theorem 4 is satisfied,
+and the edge-spanning game with non-negative edge weights
+has a non-empty core.
+Corollary 4 (Theorem 1 of [4]). The core of a flow
+game with committee control, where each edge is controlled
+by a simple game with a veto set of players, is non-empty.
+Proof. We treat each edge of the flow game as an 
+attribute, and so each attribute has a veto set of players. The
+core of a flow game (without committee) has been shown
+to be non-empty in [8]. We can again invoke Theorem 4 to
+show the non-emptiness of core for flow games with 
+committee control.
+However, the core of the game induced by a MACG may
+be non-empty even when the core of the game among 
+attributes is empty, as illustrated by the following example.
+Example 3. Suppose the minimal winning coalition of all
+aggregators in a MACG N, M, A, a, w is N, then v(S) = 0
+for all coalitions S ⊂ N. As long as v(N) ≥ 0, any 
+nonnegative vector x that satisfies
+È
+i∈N xi = v(N) is in the
+core of N, v .
+Complementary to the example above, when all the 
+aggregators have empty cores, the core of N, v is also empty.
+Theorem 5. Given a game N, v represented as a MACG
+N, M, A, a, w , if the cores of all aggregators are empty,
+v(N) > 0, and for each i ∈ N, v({i}) ≥ 0, then the core of
+N, v is empty.
+Proof. Suppose the core of N, v is non-empty. Let x
+be a member of the core, and pick an agent i such that xi >
+0. However, for each attribute, since the core is empty, by
+Lemma 1, there are at least two disjoint winning coalitions.
+Pick the winning coalition Sj
+that does not include i for
+each attribute j. Let S∗
+=
+Ë
+j Sj
+. Because S∗
+is winning
+for all coalitions, v(S∗
+) = v(N). However,
+v(N) =
+j∈N
+xj = xi +
+j /∈N
+xj ≥ xi +
+j∈S∗
+xj >
+j∈S∗
+xj
+Therefore, v(S∗
+) >
+È
+j∈S∗ xj, contradicting the fact that x
+is in the core of N, v .
+We do not have general results regarding the problem of
+Core Non-emptiness when some of the aggregators have
+non-empty cores while others have empty cores. We suspect
+knowledge about the status of the cores of the aggregators
+alone is insufficient to decide this problem.
+6.3 Core Membership
+Since it is possible for the game induced by the MACG
+to have a non-empty core when the core of the aggregate
+value function is empty (Example 3), we try to explore the
+problem of Core Membership assuming that the core of
+both the game among attributes, M, w , and the underlying
+game, N, v , is known to be non-empty, and see if there
+is any relationship between their members. One reasonable
+requirement is whether a payoff vector x in the core of N, v
+can be decomposed and re-aggregated to a payoff vector y
+in the core of M, w . Formally,
+Definition 11. We say that a vector x ∈ Rn
+≥0 can be 
+decomposed and re-aggregated into a vector y ∈ Rm
+≥0 if there
+exists Z ∈ Rm×n
+≥0 , such that
+yi =
+n
+j=1
+Zij for all i
+xj =
+m
+i=1
+Zij for all j
+We may refer Z as shares.
+When there is no restriction on the entries of Z, it is 
+always possible to decompose a payoff vector x in the core of
+N, v to a payoff vector y in the core of M, w . However, it
+seems reasonable to restrict that if an agent j is irrelevant to
+the aggregator i, i.e., i never changes the outcome of 
+aggregator j, then Zij should be restricted to be 0. Unfortunately,
+this restriction is already too strong.
+Example 4. Consider a MACG N, M, A, a, w with two
+players and three attributes. Suppose agent 1 is irrelevant
+to attribute 1, and agent 2 is irrelevant to attributes 2 and
+3. For any set of attributes T ⊆ M, let w be defined as
+w(T) =
+0 if |T| = 0 or 1
+6 if |T| = 2
+10 if |T| = 3
+177
+Since the core of a game with a finite number of players forms
+a polytope, we can verify that the set of vectors (4, 4, 2),
+(4, 2, 4), and (2, 4, 4), fully characterize the core C of M, w .
+On the other hand, the vector (10, 0) is in the core of N, v .
+This vector cannot be decomposed and re-aggregated to a
+vector in C under the stated restriction.
+Because of the apparent lack of relationship among 
+members of the core of N, v and that of M, w , we believe an
+algorithm for testing Core Membership will require more
+input than just the veto sets of the aggregators and the 
+oracle of Core Membership for the aggregate value function.
+7. CONCLUDING REMARKS
+Multi-attribute coalitional games constitute a very 
+natural way of modeling problems of interest. Its space 
+requirement compares favorably with other representations
+discussed in the literature, and hence it serves well as a
+prototype to study computational complexity of coalitional
+game theory for a variety of problems. Positive results 
+obtained under this representation can easily be translated to
+results about other representations. Some of these corollary
+results have been discussed in Sections 5 and 6.
+An important direction to explore in the future is the
+question of efficiency in updating a game, and how to 
+evaluate the solution concepts without starting from scratch. As
+pointed out at the end of Section 4.3, MACG is very 
+naturally suited for updates. Representation results regarding
+efficiency of updates, and algorithmic results regarding how
+to compute the different solution concepts from updates, will
+both be very interesting.
+Our work on approximating the Shapley value when the
+aggregate value function is a non-linear function of the 
+attributes suggests more work to be done there as well. Given
+the natural probabilistic interpretation of the Shapley value,
+we believe that a random sampling approach may have 
+significantly better theoretical guarantees.
+8. REFERENCES
+[1] J. M. Bilbao, J. R. Fern´andez, and J. J. L´opez.
+Complexity in cooperative game theory.
+http://www.esi.us.es/~mbilbao.
+[2] V. Conitzer and T. Sandholm. Complexity of
+determining nonemptiness of the core. In Proc. 18th
+Int. Joint Conf. on Artificial Intelligence, pages
+613-618, 2003.
+[3] V. Conitzer and T. Sandholm. Computing Shapley
+values, manipulating value division schemes, and
+checking core membership in multi-issue domains. In
+Proc. 19th Nat. Conf. on Artificial Intelligence, pages
+219-225, 2004.
+[4] I. J. Curiel, J. J. Derks, and S. H. Tijs. On balanced
+games and games with committee control. OR
+Spectrum, 11:83-88, 1989.
+[5] X. Deng and C. H. Papadimitriou. On the complexity
+of cooperative solution concepts. Math. Oper. Res.,
+19:257-266, May 1994.
+[6] M. R. Garey and D. S. Johnson. Computers and
+Intractability: A Guide to the Theory of
+NP-Completeness. W. H. Freeman, New York, 1979.
+[7] S. Ieong and Y. Shoham. Marginal contribution nets:
+A compact representation scheme for coalitional
+games. In Proc. 6th ACM Conf. on Electronic
+Commerce, pages 193-202, 2005.
+[8] E. Kalai and E. Zemel. Totally balanced games and
+games of flow. Math. Oper. Res., 7:476-478, 1982.
+[9] A. Mas-Colell, M. D. Whinston, and J. R. Green.
+Microeconomic Theory. Oxford University Press, New
+York, 1995.
+[10] M. J. Osborne and A. Rubinstein. A Course in Game
+Theory. The MIT Press, Cambridge, Massachusetts,
+1994.
+[11] L. S. Shapley. A value for n-person games. In H. W.
+Kuhn and A. W. Tucker, editors, Contributions to the
+Theory of Games II, number 28 in Annals of
+Mathematical Studies, pages 307-317. Princeton
+University Press, 1953.
+[12] O. Shehory and S. Kraus. Task allocation via coalition
+formation among autonomous agents. In Proc. 14th
+Int. Joint Conf. on Artificial Intelligence, pages 31-45,
+1995.
+[13] O. Shehory and S. Kraus. A kernel-oriented model for
+autonomous-agent coalition-formation in general
+environments: Implentation and results. In Proc. 13th
+Nat. Conf. on Artificial Intelligence, pages 134-140,
+1996.
+[14] J. von Neumann and O. Morgenstern. Theory of
+Games and Economic Behvaior. Princeton University
+Press, 1953.
+[15] M. Yokoo, V. Conitzer, T. Sandholm, N. Ohta, and
+A. Iwasaki. Coalitional games in open anonymous
+environments. In Proc. 20th Nat. Conf. on Artificial
+Intelligence, pages 509-515, 2005.
+Appendix
+We complete the missing proofs from the main text here.
+To prove Proposition 1, we need the following lemma.
+Lemma 2. Marginal contribution nets when all coalitions
+are restricted to have values 0 or 1 have the same 
+representation power as an AND/OR circuit with negation at the
+literal level (i.e., AC0
+circuit) of depth two.
+Proof. If a rule assigns a negative value in the marginal
+contribution nets, we can write the rule by a corresponding
+set of at most n rules, where n is the number of agents, such
+that each of which has positive values through application of
+De Morgan"s Law. With all values of the rules non-negative,
+we can treat the weighted summation step of marginal 
+contribution nets can be viewed as an OR, and each rule as
+a conjunction over literals, possibly negated. This exactly
+match up with an AND/OR circuit of depth two.
+Proof (Proposition 1). The parity game can be 
+represented with a MACG using a single attribute, aggregator
+of sum, and an aggregate value function that evaluates that
+sum modulus two.
+As a Boolean function, parity is known to require an 
+exponential number of prime implicants. By Lemma 2, a prime
+implicant is the exact analogue of a pattern in a rule of 
+marginal contribution nets. Therefore, to represent the parity
+function, a marginal contribution nets must be an 
+exponential number of rules.
+Finally, as shown in [7], a marginal contribution net is at
+worst a factor of O(n) less compact than multi-issue 
+representation. Therefore, multi-issue representation will also
+178
+take exponential space to represent the parity game. This
+is assuming that each issue in the game is represented in
+characteristic form.
+Proof (Theorem 2). An instance of three-dimensional
+matching is as follows [6]: Given set P ⊆ W × X × Y ,
+where W , X, Y are disjoint sets having the same number q
+of elements, does there exist a matching P ⊆ P such that
+|P | = q and no two elements of P agree in any 
+coordinate. For notation, let P = {p1, p2, . . . , pK}. We construct
+a MACG N, M, A, a, w as follows:
+• M: Let attributes 1 to q correspond to elements in W ,
+(q+1) to 2q correspond to elements in X, (2q+1) to 3q
+corresponds to element in Y , and let there be a special
+attribute (3q + 1).
+• N: Let player i corresponds to pi, and let there be a
+special player .
+• A: Let Aji = 1 if the element corresponding to 
+attribute j is in pi. Thus, for the first K columns, there
+are exactly three non-zero entries. We also set
+A(3q+1) = 1.
+• a: for each aggregator j, aj
+(A(S)) = 1 if and only if
+sum of row j of A(S) equals 1.
+• w: product over all aj
+.
+In the game N, v that corresponds to this construction,
+v(S) = 1 if and only if all attributes are covered exactly
+once. Therefore, for /∈ T ⊆ N, v(T ∪ { }) − v(T) = 1 if
+and only if T covers attributes 1 to 3q exactly once. Since
+all such T, if exists, must be of size q, the number of 
+threedimensional matchings is given by
+φ (v)
+(K + 1)!
+q!(K − q)!
+179

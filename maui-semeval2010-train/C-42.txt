@@ -1,0 +1,563 @@
+Demonstration of Grid-Enabled Ensemble Kalman Filter
+Data Assimilation Methodology for Reservoir
+Characterization
+Ravi Vadapalli
+High Performance Computing Center
+Texas Tech University
+Lubbock, TX 79409
+001-806-742-4350
+Ravi.Vadapalli@ttu.edu
+Ajitabh Kumar
+Department of Petroleum Engineering
+Texas A&M University
+College Station, TX 77843
+001-979-847-8735
+akumar@tamu.edu
+Ping Luo
+Supercomputing Facility
+Texas A&M University
+College Station, TX 77843
+001-979-862-3107
+pingluo@sc.tamu.edu
+Shameem Siddiqui
+Department of Petroleum Engineering
+Texas Tech University
+Lubbock, TX 79409
+001-806-742-3573
+Shameem.Siddiqui@ttu.edu
+Taesung Kim
+Supercomputing Facility
+Texas A&M University
+College Station, TX 77843
+001-979-204-5076
+tskim@sc.tamu.edu
+ABSTRACT
+Ensemble Kalman filter data assimilation methodology is a
+popular approach for hydrocarbon reservoir simulations in energy
+exploration. In this approach, an ensemble of geological models
+and production data of oil fields is used to forecast the dynamic
+response of oil wells. The Schlumberger ECLIPSE software is
+used for these simulations. Since models in the ensemble do not
+communicate, message-passing implementation is a good choice.
+Each model checks out an ECLIPSE license and therefore,
+parallelizability of reservoir simulations depends on the number
+licenses available. We have Grid-enabled the ensemble Kalman
+filter data assimilation methodology for the TIGRE Grid
+computing environment. By pooling the licenses and computing
+resources across the collaborating institutions using GridWay
+metascheduler and TIGRE environment, the computational
+accuracy can be increased while reducing the simulation runtime.
+In this paper, we provide an account of our efforts in 
+Gridenabling the ensemble Kalman Filter data assimilation
+methodology. Potential benefits of this approach, observations
+and lessons learned will be discussed.
+Categories and Subject Descriptors
+C 2.4 [Distributed Systems]: Distributed applications
+General Terms
+Algorithms, Design, Performance
+1. INTRODUCTION
+Grid computing [1] is an emerging collaborative
+computing paradigm to extend institution/organization
+specific high performance computing (HPC) capabilities
+greatly beyond local resources. Its importance stems from
+the fact that ground breaking research in strategic
+application areas such as bioscience and medicine, energy
+exploration and environmental modeling involve strong
+interdisciplinary components and often require intercampus
+collaborations and computational capabilities beyond
+institutional limitations.
+The Texas Internet Grid for Research and Education
+(TIGRE) [2,3] is a state funded cyberinfrastructure
+development project carried out by five (Rice, A&M, TTU,
+UH and UT Austin) major university systems - collectively
+called TIGRE Institutions. The purpose of TIGRE is to
+create a higher education Grid to sustain and extend
+research and educational opportunities across Texas.
+TIGRE is a project of the High Performance Computing
+across Texas (HiPCAT) [4] consortium. The goal of
+HiPCAT is to support advanced computational technologies
+to enhance research, development, and educational
+activities.
+The primary goal of TIGRE is to design and deploy
+state-of-the-art Grid middleware that enables integration of
+computing systems, storage systems and databases,
+visualization laboratories and displays, and even
+instruments and sensors across Texas. The secondary goal
+is to demonstrate the TIGRE capabilities to enhance
+research and educational opportunities in strategic
+application areas of interest to the State of Texas. These are
+bioscience and medicine, energy exploration and air quality
+modeling. Vision of the TIGRE project is to foster
+interdisciplinary and intercampus collaborations, identify
+novel approaches to extend academic-government-private
+partnerships, and become a competitive model for external
+funding opportunities. The overall goal of TIGRE is to
+support local, campus and regional user interests and offer
+avenues to connect with national Grid projects such as
+Open Science Grid [5], and TeraGrid [6].
+Within the energy exploration strategic application area,
+we have Grid-enabled the ensemble Kalman Filter (EnKF)
+[7] approach for data assimilation in reservoir modeling and
+demonstrated the extensibility of the application using the
+TIGRE environment and the GridWay [8] metascheduler.
+Section 2 provides an overview of the TIGRE environment
+and capabilities. Application description and the need for
+Grid-enabling EnKF methodology is provided in Section 3.
+The implementation details and merits of our approach are
+discussed in Section 4. Conclusions are provided in Section
+5. Finally, observations and lessons learned are documented
+in Section 6.
+2. TIGRE ENVIRONMENT
+The TIGRE Grid middleware consists of minimal set of
+components derived from a subset of the Virtual Data
+Toolkit (VDT) [9] which supports a variety of operating
+systems. The purpose of choosing a minimal software stack
+is to support applications at hand, and to simplify
+installation and distribution of client/server stacks across
+TIGRE sites. Additional components will be added as they
+become necessary. The PacMan [10] packaging and
+distribution mechanism is employed for TIGRE
+client/server installation and management. The PacMan
+distribution mechanism involves retrieval, installation, and
+often configuration of the packaged software. This
+approach allows the clients to keep current, consistent
+versions of TIGRE software. It also helps TIGRE sites to
+install the needed components on resources distributed
+throughout the participating sites. The TIGRE client/server
+stack consists of an authentication and authorization layer,
+Globus GRAM4-based job submission via web services
+(pre-web services installations are available up on request).
+The tools for handling Grid proxy generation, Grid-enabled
+file transfer and Grid-enabled remote login are supported.
+The pertinent details of TIGRE services and tools for job
+scheduling and management are provided below.
+2.1. Certificate Authority
+The TIGRE security infrastructure includes a certificate
+authority (CA) accredited by the International Grid Trust
+Federation (IGTF) for issuing X. 509 user and resource
+Grid certificates [11]. The Texas Advanced Computing
+Center (TACC), University of Texas at Austin is the
+TIGRE"s shared CA. The TIGRE Institutions serve as
+Registration Authorities (RA) for their respective local user
+base. For up-to-date information on securing user and
+resource certificates and their installation instructions see
+ref [2]. The users and hosts on TIGRE are identified by
+their distinguished name (DN) in their X.509 certificate
+provided by the CA. A native Grid-mapfile that contains a
+list of authorized DNs is used to authenticate and authorize
+user job scheduling and management on TIGRE site
+resources. At Texas Tech University, the users are
+dynamically allocated one of the many generic pool
+accounts. This is accomplished through the Grid User
+Management System (GUMS) [12].
+2.2. Job Scheduling and Management
+The TIGRE environment supports GRAM4-based job
+submission via web services. The job submission scripts are
+generated using XML. The web services GRAM translates
+the XML scripts into target cluster specific batch schedulers
+such as LSF, PBS, or SGE. The high bandwidth file transfer
+protocols such as GridFTP are utilized for staging files in
+and out of the target machine. The login to remote hosts for
+compilation and debugging is only through GSISSH service
+which requires resource authentication through X.509
+certificates. The authentication and authorization of Grid
+jobs are managed by issuing Grid certificates to both users
+and hosts. The certificate revocation lists (CRL) are
+updated on a daily basis to maintain high security standards
+of the TIGRE Grid services. The TIGRE portal [2]
+documentation area provides a quick start tutorial on
+running jobs on TIGRE.
+2.3. Metascheduler
+The metascheduler interoperates with the cluster level
+batch schedulers (such as LSF, PBS) in the overall Grid
+workflow management. In the present work, we have
+employed GridWay [8] metascheduler - a Globus incubator
+project - to schedule and manage jobs across TIGRE.
+The GridWay is a light-weight metascheduler that fully
+utilizes Globus functionalities. It is designed to provide
+efficient use of dynamic Grid resources by multiple users
+for Grid infrastructures built on top of Globus services. The
+TIGRE site administrator can control the resource sharing
+through a powerful built-in scheduler provided by GridWay
+or by extending GridWay"s external scheduling module to
+provide their own scheduling policies. Application users
+can write job descriptions using GridWay"s simple and
+direct job template format (see Section 4 for details) or
+standard Job Submission Description Language (JSDL).
+See section 4 for implementation details.
+2.4. Customer Service Management System
+A TIGRE portal [2] was designed and deployed to interface
+users and resource providers. It was designed using
+GridPort [13] and is maintained by TACC. The TIGRE
+environment is supported by open source tools such as the
+Open Ticket Request System (OTRS) [14] for servicing
+trouble tickets, and MoinMoin [15] Wiki for TIGRE
+content and knowledge management for education, outreach
+and training. The links for OTRS and Wiki are consumed
+by the TIGRE portal [2] - the gateway for users and
+resource providers. The TIGRE resource status and loads
+are monitored by the Grid Port Information Repository
+(GPIR) service of the GridPort toolkit [13] which interfaces
+with local cluster load monitoring service such as Ganglia.
+The GPIR utilizes cron jobs on each resource to gather
+site specific resource characteristics such as jobs that are
+running, queued and waiting for resource allocation.
+3. ENSEMBLE KALMAN FILTER
+APPLICATION
+The main goal of hydrocarbon reservoir simulations is to
+forecast the production behavior of oil and gas field
+(denoted as field hereafter) for its development and optimal
+management. In reservoir modeling, the field is divided into
+several geological models as shown in Figure 1. For
+accurate performance forecasting of the field, it is necessary
+to reconcile several geological models to the dynamic
+response of the field through history matching [16-20].
+Figure 1. Cross-sectional view of the Field. Vertical
+layers correspond to different geological models and the
+nails are oil wells whose historical information will be
+used for forecasting the production behavior.
+(Figure Ref:http://faculty.smu.edu/zchen/research.html).
+The EnKF is a Monte Carlo method that works with an
+ensemble of reservoir models. This method utilizes 
+crosscovariances [21] between the field measurements and the
+reservoir model parameters (derived from several models)
+to estimate prediction uncertainties. The geological model
+parameters in the ensemble are sequentially updated with a
+goal to minimize the prediction uncertainties. Historical
+production response of the field for over 50 years is used in
+these simulations. The main advantage of EnKF is that it
+can be readily linked to any reservoir simulator, and can
+assimilate latest production data without the need to re-run
+the simulator from initial conditions. Researchers in Texas
+are large subscribers of the Schlumberger ECLIPSE [22]
+package for reservoir simulations. In the reservoir
+modeling, each geological model checks out an ECLIPSE
+license. The simulation runtime of the EnKF methodology
+depends on the number of geological models used, number
+of ECLIPSE licenses available, production history of the
+field, and propagated uncertainties in history matching.
+The overall EnKF workflow is shown Figure 2.
+Figure 2. Ensemble Kaman Filter Data Assimilation
+Workflow. Each site has L licenses.
+At START, the master/control process (EnKF main
+program) reads the simulation configuration file for number
+(N) of models, and model-specific input files. Then, N
+working directories are created to store the output files. At
+the end of iteration, the master/control process collects the
+output files from N models and post processes 
+crosscovariances [21] to estimate the prediction uncertainties.
+This information will be used to update models (or input
+files) for the next iteration. The simulation continues until
+the production histories are exhausted.
+Typical EnKF simulation with N=50 and field histories
+of 50-60 years, in time steps ranging from three months to a
+year, takes about three weeks on a serial computing
+environment.
+In parallel computing environment, there is no
+interprocess communication between the geological models
+in the ensemble. However, at the end of each simulation
+time-step, model-specific output files are to be collected for
+analyzing cross covariances [21] and to prepare next set of
+input files. Therefore, master-slave model in 
+messagepassing (MPI) environment is a suitable paradigm. In this
+approach, the geological models are treated as slaves and
+are distributed across the available processors. The master
+Cluster or (TIGRE/GridWay)
+START
+Read Configuration File
+Create N Working Directories
+Create N Input files
+Model l Model 2 Model N. . .
+ECLIPSE
+on site A
+ECLIPSE
+on Site B
+ECLIPSE
+on Site Z
+Collect N Model Outputs,
+Post-process Output files
+END
+. . .
+process collects model-specific output files, analyzes and
+prepares next set of input files for the simulation. Since
+each geological model checks out an ECLIPSE license,
+parallelizability of the simulation depends on the number of
+licenses available. When the available number of licenses is
+less than the number of models in the ensemble, one or
+more of the nodes in the MPI group have to handle more
+than one model in a serial fashion and therefore, it takes
+longer to complete the simulation.
+A Petroleum Engineering Department usually procures
+10-15 ECLIPSE licenses while at least ten-fold increase in
+the number of licenses would be necessary for industry
+standard simulations. The number of licenses can be
+increased by involving several Petroleum Engineering
+Departments that support ECLIPSE package.
+Since MPI does not scale very well for applications that
+involve remote compute clusters, and to get around the
+firewall issues with license servers across administrative
+domains, Grid-enabling the EnKF workflow seems to be
+necessary. With this motivation, we have implemented
+Grid-enabled EnKF workflow for the TIGRE environment
+and demonstrated parallelizability of the application across
+TIGRE using GridWay metascheduler. Further details are
+provided in the next section.
+4. IMPLEMENTATION DETAILS
+To Grid-enable the EnKF approach, we have eliminated
+the MPI code for parallel processing and replaced with N
+single processor jobs (or sub-jobs) where, N is the number
+of geological models in the ensemble. These model-specific
+sub-jobs were distributed across TIGRE sites that support
+ECLIPSE package using the GridWay [8] metascheduler.
+For each sub-job, we have constructed a GridWay job
+template that specifies the executable, input and output
+files, and resource requirements. Since the TIGRE compute
+resources are not expected to change frequently, we have
+used static resource discovery policy for GridWay and the
+sub-jobs were scheduled dynamically across the TIGRE
+resources using GridWay. Figure 3 represents the sub-job
+template file for the GridWay metascheduler.
+Figure 3. GridWay Sub-Job Template
+In Figure 3, REQUIREMENTS flag is set to choose the
+resources that satisfy the application requirements. In the
+case of EnKF application, for example, we need resources
+that support ECLIPSE package. ARGUMENTS flag
+specifies the model in the ensemble that will invoke
+ECLIPSE at a remote site. INPUT_FILES is prepared by
+the EnKF main program (or master/control process) and is
+transferred by GridWay to the remote site where it is 
+untared and is prepared for execution. Finally,
+OUTPUT_FILES specifies the name and location where the
+output files are to be written.
+The command-line features of GridWay were used to
+collect and process the model-specific outputs to prepare
+new set of input files. This step mimics MPI process
+synchronization in master-slave model. At the end of each
+iteration, the compute resources and licenses are committed
+back to the pool. Table 1 shows the sub-jobs in TIGRE
+Grid via GridWay using gwps command and for clarity,
+only selected columns were shown
+.
+USER JID DM EM NAME HOST
+pingluo 88 wrap pend enkf.jt antaeus.hpcc.ttu.edu/LSF
+pingluo 89 wrap pend enkf.jt antaeus.hpcc.ttu.edu/LSF
+pingluo 90 wrap actv enkf.jt minigar.hpcc.ttu.edu/LSF
+pingluo 91 wrap pend enkf.jt minigar.hpcc.ttu.edu/LSF
+pingluo 92 wrap done enkf.jt cosmos.tamu.edu/PBS
+pingluo 93 wrap epil enkf.jt cosmos.tamu.edu/PBS
+Table 1. Job scheduling across TIGRE using GridWay
+Metascheduler. DM: Dispatch state, EM: Execution state,
+JID is the job id and HOST corresponds to site specific
+cluster and its local batch scheduler.
+When a job is submitted to GridWay, it will go through a
+series of dispatch (DM) and execution (EM) states. For
+DM, the states include pend(ing), prol(og), wrap(per),
+epil(og), and done. DM=prol means the job has been
+scheduled to a resource and the remote working directory is
+in preparation. DM=warp implies that GridWay is
+executing the wrapper which in turn executes the
+application. DM=epil implies the job has finished
+running at the remote site and results are being transferred
+back to the GridWay server. Similarly, when EM=pend
+implies the job is waiting in the queue for resource and the
+job is running when EM=actv. For complete list of
+message flags and their descriptions, see the documentation
+in ref [8].
+We have demonstrated the Grid-enabled EnKF runs
+using GridWay for TIGRE environment. The jobs are so
+chosen that the runtime doesn"t exceed more than a half
+hour. The simulation runs involved up to 20 jobs between
+A&M and TTU sites with TTU serving 10 licenses. For
+resource information, see Table I.
+One of the main advantages of Grid-enabled EnKF
+simulation is that both the resources and licenses are
+released back to the pool at the end of each simulation time
+step unlike in the case of MPI implementation where
+licenses and nodes are locked until the completion of entire
+simulation. However, the fact that each sub-job gets
+scheduled independently via GridWay could possibly incur
+another time delay caused by waiting in queue for execution
+in each simulation time step. Such delays are not expected
+EXECUTABLE=runFORWARD
+REQUIREMENTS=HOSTNAME=cosmos.tamu.edu |
+HOSTNAME=antaeus.hpcc.ttu.edu |
+HOSTNAME=minigar.hpcc.ttu.edu |
+ARGUMENTS=001
+INPUT_FILES=001.in.tar
+OUTPUT_FILES=001.out.tar
+in MPI implementation where the node is blocked for
+processing sub-jobs (model-specific calculation) until the
+end of the simulation. There are two main scenarios for
+comparing Grid and cluster computing approaches.
+Scenario I: The cluster is heavily loaded. The conceived
+average waiting time of job requesting large number of
+CPUs is usually longer than waiting time of jobs requesting
+single CPU. Therefore, overall waiting time could be
+shorter in Grid approach which requests single CPU for
+each sub-job many times compared to MPI implementation
+that requests large number of CPUs at a single time. It is
+apparent that Grid scheduling is beneficial especially when
+cluster is heavily loaded and requested number of CPUs for
+the MPI job is not readily available.
+Scenario II: The cluster is relatively less loaded or
+largely available. It appears the MPI implementation is
+favorable compared to the Grid scheduling. However,
+parallelizability of the EnKF application depends on the
+number of ECLIPSE licenses and ideally, the number of
+licenses should be equal to the number of models in the
+ensemble. Therefore, if a single institution does not have
+sufficient number of licenses, the cluster availability doesn"t
+help as much as it is expected.
+Since the collaborative environment such as TIGRE can
+address both compute and software resource requirements
+for the EnKF application, Grid-enabled approach is still
+advantageous over the conventional MPI implementation in
+any of the above scenarios.
+5. CONCLUSIONS AND FUTURE WORK
+TIGRE is a higher education Grid development project
+and its purpose is to sustain and extend research and
+educational opportunities across Texas. Within the energy
+exploration application area, we have Grid-enabled the MPI
+implementation of the ensemble Kalman filter data
+assimilation methodology for reservoir characterization.
+This task was accomplished by removing MPI code for
+parallel processing and replacing with single processor jobs
+one for each geological model in the ensemble. These
+single processor jobs were scheduled across TIGRE via
+GridWay metascheduler. We have demonstrated that by
+pooling licenses across TIGRE sites, more geological
+models can be handled in parallel and therefore conceivably
+better simulation accuracy. This approach has several
+advantages over MPI implementation especially when a site
+specific cluster is heavily loaded and/or the number licenses
+required for the simulation is more than those available at a
+single site.
+Towards the future work, it would be interesting to
+compare the runtime between MPI, and Grid
+implementations for the EnKF application. This effort could
+shed light on quality of service (QoS) of Grid environments
+in comparison with cluster computing.
+Another aspect of interest in the near future would be
+managing both compute and license resources to address
+the job (or processor)-to-license ratio management.
+6. OBSERVATIONS AND LESSIONS
+LEARNED
+The Grid-enabling efforts for EnKF application have
+provided ample opportunities to gather insights on the
+visibility and promise of Grid computing environments for
+application development and support. The main issues are
+industry standard data security and QoS comparable to
+cluster computing.
+Since the reservoir modeling research involves
+proprietary data of the field, we had to invest substantial
+efforts initially in educating the application researchers on
+the ability of Grid services in supporting the industry
+standard data security through role- and privilege-based
+access using X.509 standard.
+With respect to QoS, application researchers expect
+cluster level QoS with Grid environments. Also, there is a
+steep learning curve in Grid computing compared to the
+conventional cluster computing. Since Grid computing is
+still an emerging technology, and it spans over several
+administrative domains, Grid computing is still premature
+especially in terms of the level of QoS although, it offers
+better data security standards compared to commodity
+clusters.
+It is our observation that training and outreach programs
+that compare and contrast the Grid and cluster computing
+environments would be a suitable approach for enhancing
+user participation in Grid computing. This approach also
+helps users to match their applications and abilities Grids
+can offer.
+In summary, our efforts through TIGRE in Grid-enabling
+the EnKF data assimilation methodology showed
+substantial promise in engaging Petroleum Engineering
+researchers through intercampus collaborations. Efforts are
+under way to involve more schools in this effort. These
+efforts may result in increased collaborative research,
+educational opportunities, and workforce development
+through graduate/faculty research programs across TIGRE
+Institutions.
+7. ACKNOWLEDGMENTS
+The authors acknowledge the State of Texas for supporting
+the TIGRE project through the Texas Enterprise Fund, and
+TIGRE Institutions for providing the mechanism, in which
+the authors (Ravi Vadapalli, Taesung Kim, and Ping Luo)
+are also participating. The authors thank the application
+researchers Prof. Akhil Datta-Gupta of Texas A&M
+University and Prof. Lloyd Heinze of Texas Tech
+University for their discussions and interest to exploit the
+TIGRE environment to extend opportunities in research and
+development.
+8. REFERENCES
+[1] Foster, I. and Kesselman, C. (eds.) 2004. The Grid: Blueprint
+for a new computing infrastructure (The Elsevier series in
+Grid computing)
+[2] TIGRE Portal: http://tigreportal.hipcat.net
+[3] Vadapalli, R. Sill, A., Dooley, R., Murray, M., Luo, P., Kim,
+T., Huang, M., Thyagaraja, K., and Chaffin, D. 2007.
+Demonstration of TIGRE environment for Grid
+enabled/suitable applications. 8th
+IEEE/ACM Int. Conf. on
+Grid Computing, Sept 19-21, Austin
+[4] The High Performance Computing across Texas Consortium
+http://www.hipcat.net
+[5] Pordes, R. Petravick, D. Kramer, B. Olson, D. Livny, M.
+Roy, A. Avery, P. Blackburn, K. Wenaus, T. Würthwein, F.
+Foster, I. Gardner, R. Wilde, M. Blatecky, A. McGee, J. and
+Quick, R. 2007. The Open Science Grid, J. Phys Conf Series
+http://www.iop.org/EJ/abstract/1742-6596/78/1/012057 and
+http://www.opensciencegrid.org
+[6] Reed, D.A. 2003. Grids, the TeraGrid and Beyond,
+Computer, vol 30, no. 1 and http://www.teragrid.org
+[7] Evensen, G. 2006. Data Assimilation: The Ensemble Kalman
+Filter, Springer
+[8] Herrera, J. Huedo, E. Montero, R. S. and Llorente, I. M.
+2005. Scientific Programming, vol 12, No. 4. pp 317-331
+[9] Avery, P. and Foster, I. 2001. The GriPhyN project: Towards
+petascale virtual data grids, technical report 
+GriPhyN-200115 and http://vdt.cs.wisc.edu
+[10] The PacMan documentation and installation guide
+http://physics.bu.edu/pacman/htmls
+[11] Caskey, P. Murray, M. Perez, J. and Sill, A. 2007. Case
+studies in identify management for virtual organizations,
+EDUCAUSE Southwest Reg. Conf., Feb 21-23, Austin, TX.
+http://www.educause.edu/ir/library/pdf/SWR07058.pdf
+[12] The Grid User Management System (GUMS)
+https://www.racf.bnl.gov/Facility/GUMS/index.html
+[13] Thomas, M. and Boisseau, J. 2003. Building grid computing
+portals: The NPACI grid portal toolkit, Grid computing:
+making the global infrastructure a reality, Chapter 28,
+Berman, F. Fox, G. Thomas, M. Boisseau, J. and Hey, T.
+(eds), John Wiley and Sons, Ltd, Chichester
+[14] Open Ticket Request System http://otrs.org
+[15] The MoinMoin Wiki Engine
+http://moinmoin.wikiwikiweb.de
+[16] Vasco, D.W. Yoon, S. and Datta-Gupta, A. 1999. Integrating
+dynamic data into high resolution reservoir models using
+streamline-based analytic sensitivity coefficients, Society of
+Petroleum Engineers (SPE) Journal, 4 (4).
+[17] Emanuel, A. S. and Milliken, W. J. 1998. History matching
+finite difference models with 3D streamlines, SPE 49000,
+Proc of the Annual Technical Conf and Exhibition, Sept 
+2730, New Orleans, LA.
+[18] Nævdal, G. Johnsen, L.M. Aanonsen, S.I. and Vefring, E.H.
+2003. Reservoir monitoring and Continuous Model Updating
+using Ensemble Kalman Filter, SPE 84372, Proc of the
+Annual Technical Conf and Exhibition, Oct 5-8, Denver,
+CO.
+[19] Jafarpour B. and McLaughlin, D.B. 2007. History matching
+with an ensemble Kalman filter and discrete cosine
+parameterization, SPE 108761, Proc of the Annual Technical
+Conf and Exhibition, Nov 11-14, Anaheim, CA
+[20] Li, G. and Reynolds, A. C. 2007. An iterative ensemble
+Kalman filter for data assimilation, SPE 109808, Proc of the
+SPE Annual Technical Conf and Exhibition, Nov 11-14,
+Anaheim, CA
+[21] Arroyo-Negrete, E. Devagowda, D. Datta-Gupta, A. 2006.
+Streamline assisted ensemble Kalman filter for rapid and
+continuous reservoir model updating. Proc of the Int. Oil &
+Gas Conf and Exhibition, SPE 104255, Dec 5-7, China
+[22] ECLIPSE Reservoir Engineering Software
+http://www.slb.com/content/services/software/reseng/index.a
+sp

@@ -1,0 +1,559 @@
+PackageBLAST: An Adaptive Multi-Policy Grid Service for
+Biological Sequence Comparison
+∗
+Marcelo S. Sousa
+University of Brasilia
+Campus UNB - ICC Norte, sub-solo
+Brasilia, Brazil
+msousa@unb.br
+Alba Cristina M. A. Melo
+University of Brasilia
+Campus UNB - ICC Norte, sub-solo
+Brasilia, Brazil
+alves@unb.br
+ABSTRACT
+In this paper, we propose an adaptive task allocation 
+framework to perform BLAST searches in a grid environment
+against sequence database segments. The framework, called
+PackageBLAST, provides an infrastructure to choose or 
+incorporate task allocation strategies. Furthermore, we 
+propose a mechanism to compute grid nodes execution weight,
+adapting the chosen allocation policy to the current 
+computational power of the nodes. Our results present very good
+speedups and also show that no single allocation strategy is
+able to achieve the lowest execution times for all scenarios.
+Categories and Subject Descriptors
+C.2.4 [Distributed Systems]: Distributed Applications;
+J.3 [Life and Medical Sciences]: Biology and Genetics
+1. INTRODUCTION
+Biological sequence comparison (or sequence alignment)
+is one of the most important problems in computational 
+biology, given the number and diversity of the sequences and
+the frequency on which it is needed to be solved daily.
+SW [14] is an exact algorithm that finds the best local
+alignment between two sequences of size n in quadratic time
+and space. In genome projects, the size of the sequences to
+be compared is constantly increasing, thus an O(n2
+) solution
+is expensive. For this reason, heuristics like BLAST [3] were
+proposed to reduce execution time.
+The popularity of the Internet made possible the 
+interconnection of millions of powerful machines in a global scale.
+This led to the idea of grid computing, which involves 
+cooperative and secure sharing of non-dedicated and 
+heterogeneous resources that are geographically distributed [5].
+Resource scheduling is one of the most important 
+components of a grid system. The choice of the best resources for
+a particular application is called task allocation, which is
+an NP-Complete problem. Grid applications usually do not
+have high communication rates and many of them follow the
+master/slave model [13]. In order to schedule master/slave
+applications many task allocation policies were proposed
+such as Self Scheduling [15] and FAC2 [8]. The choice of
+the best allocation policy depends on the application access
+pattern and on the environment in which it runs [13].
+In this paper, we propose PackageBLAST, an adaptive
+multi-policy grid service to run BLAST searches in grids
+composed by segmented genetic databases. PackageBLAST
+executes on Globus 3 [4] and, by now, provides five allocation
+policies. Also, we propose an adaptive mechanism to assign
+weights to the grid nodes, taking into account their current
+workload. As far as we know, this is the first grid service that
+runs BLAST with multiple task policies with a segmented
+database in a heterogeneous non-dedicated platform.
+This paper is organized as follows. Section 2 presents the
+sequence comparison problem and the BLAST algorithm.
+Section 3 describes allocation policies for grids. Section
+4 discusses related work. Section 5 presents the design of
+PackageBLAST. Experimental results are discussed in 
+section 6. Section 7 concludes the paper.
+2. SEQUENCE COMPARISON
+To compare two sequences, we must find the best 
+alignment, which is to place one sequence above the other making
+clear the correspondence between similar characters [7].
+Given an alignment between two sequences, a score is 
+usually associated for it as follows (figure 1). For each column,
+we associate, for instance, +1 if the two characters are 
+identical, -1 if the characters are different and -2 if one of them
+is a space. The score is the sum of all the values and the
+maximal score is the similarity between the sequences.
+To compute exact local sequence alignments, [14] 
+proposed an algorithm (SW), based on dynamic programming,
+with quadratic time and space complexity.
+Usually, one given biological sequence is compared against
+thousands or even millions of sequences that compose 
+genetic data banks. By now, there are millions of entries 
+composed of billions of nucleotides at GenBank, which is one
+of the most important public gene repositories. Due to the
+156
+G A C G G A T T A G
+G A T C G G A A T A G
++1 +1 −2 +1 +1 +1 +1 −1 +1 +1 +1
+Σ = 6
+Figure 1: Example of an alignment with score 6
+current growth rate, these databases will soon achieve 
+terabytes.
+In this scenario, the use of exact methods such as SW is
+prohibitive. For this reason, faster heuristic methods are
+proposed which do not guarantee that the best alignment
+will be produced. Usually, these heuristic methods are 
+evaluated using the concepts of sensitivity and sensibility. 
+Sensitivity is the rate at which the method fails to identify similar
+sequences whereas sensibility is the rate at which the method
+identifies sequences that are not similar [7]. BLAST [1] is the
+most widely used heuristic method for sequence comparison.
+2.1 The BLAST Algorithm
+BLAST (Basic Local Alignment Tool) [1] is a set of 
+programs used to search DNA and protein databases for 
+similarities between sequences. It is designed to obtain high 
+performance with low impact in terms of sensibility. BLAST
+provides programs to compare many combinations of query
+and database sequence types (table 1).
+Table 1: Some of the BLAST family programs
+Program Database Query Translation
+BLASTN Nucleotide Nucleotide None
+BLASTP Protein Protein None
+BLASTX Protein Nucleotide Query
+The first version of BLAST searched for local similarities
+without taking spaces (gaps) into account. In 1996-1997,
+two gapped versions of BLAST emerged: NCBI-BLAST [3]
+and WU-BLAST [6].
+Basically, the algorithm proceeds in three steps: seeding,
+extension and evaluation. In the seeding step, a query 
+sequence is split in portions called words of size W. These
+words are matched to database sequences and used as 
+alignment seeds if their scores are higher than a threshold T.
+In the extension step, alignments are generated from seeds.
+A parameter X maintains the recent alignment history and
+controls this step. Once seeds are extended, the last step
+begins. The alignments are evaluated to determine if they
+are statistically significant. The significant ones are termed
+HSPs (High-scoring Segment Pairs). A new parameter, S,
+is used to sort alignments. The combination of parameters
+W, T, X and S is used to determine the sensitivity and
+speed of BLAST searches.
+3. TASK ALLOCATION FOR GRIDS
+3.1 Grid Computing
+Grid Computing was initially developed to enable resource
+sharing between scientific institutions who needed to share
+data, software and computational power. The Globus Toolkit
+[4] emerged as an open source project and quickly became a
+de facto standard for grid computing infrastructure. Globus
+implements a set of protocols, APIs and services used by
+hundreds of grid applications all over the world.
+In 2002, the Open Grid Services Architecture (OGSA)
+was introduced by the Global Grid Forum (GGF) to expand
+standardization. OGSA provided a new architecture for grid
+applications based on web services in order to achieve 
+interoperability using industry standards. Many OGSA 
+architecture implementations were developed, including one for
+Globus. The work carried out in this paper is deployed on
+a grid based on Globus (GT3).
+Usually, grid applications are modelled as master/slave,
+where one problem is divided in many independent work
+units (tasks) of smaller size that can be distributed to slave
+nodes for parallel processing.
+A very important problem to be solved in this context
+is task allocation. The task allocation problem consists of
+assigning tasks to processors in order to maximize system
+performance [13]. In this problem, it is assumed that no
+precedence relations exist among the tasks.
+3.2 Task Allocation Strategies
+Given a master/slave application composed by a master
+m and S slaves, the allocation function allocate(m, si, N, S)
+determines how many tasks out of N must be assigned to
+a slave si (equation 1), where A(N, S) represents an 
+allocation policy. WeightFactor(m, si, S) was defined by [13]
+(equation 2) and provides weights for each slave si, based
+on its statically known processing rate (WorkerRate).
+allocate(m, si, N, S) = A(N, S) ∗ W eightF actor(m, si, S) (1)
+W eightF actor(m, si, S) =
+P ∗ W orkerRate(m, si)
+P
+i=1 W orkerRate(m, si)
+(2)
+The following subsections present some work allocation
+policies, which are instances A(N, S) of equation 1.
+3.3 Fixed (Static Scheduling)
+The Fixed [13] strategy distributes all work units 
+uniformly to slaves nodes. This strategy is appropriate for 
+homogeneous systems with dedicated resources (equation 3).
+A(N, S) =
+N
+S
+(3)
+3.4 Self Scheduling (SS)
+Self Scheduling (SS) [15] distributes a single work unit to
+every slave node (equation 4).
+A(N, S) = 1, while work units are still left to allocate (4)
+In SS, the maximum imbalance is limited by the 
+processing time of a work unit in the slowest node. Nevertheless,
+SS usually demands a lot of communication, since each work
+unit retrieval requires one interaction with the master.
+3.5 Trapezoidal Self Scheduling (TSS)
+Trapezoidal Self-Scheduling (TSS) [16] allocates work units
+in groups with a linearly decreasing size. This strategy uses
+two variables, steps and δ, that represent the total number
+of allocation steps and the block reduction factor, 
+respectively (equations 5 and 6).
+steps =
+4NS
+N + 2S
+(5)
+157
+δ =
+N − 2S
+2S(steps − 1)
+(6)
+TSS calculates the length of the sth
+block using the 
+difference between the length of the first block and total reduction
+from the last s − 1 blocks (equation 7).
+A(s, N, S) = max
+N
+2S
+− [(s − 1) ∗ δ] , 1 (7)
+3.6 Guided Self Scheduling (GSS)
+Guided Self-Scheduling (GSS) [11] allocates work units
+in groups whose length decrease exponentially. Its goal is
+to create a tradeoff between the number of the work units
+processed and the imbalance in finishing times (equation 8).
+A(s, N, S) = max
+N 1 − 1
+S
+s−1
+S
+, 1 , s > 0 (8)
+3.7 Factoring (FAC2)
+FAC2 allocates work units in cycles consisting of S 
+allocation sequences. Equation 9 shows the function that defines
+the cycle number of an iteration s. In FAC2, half of the
+remaining work units are allocated in each round (equation
+10).
+round(s) =
+(s − 1)
+S
++ 1 (9)
+A(s, N, S) = max
+N
+S ∗ 2round(s)
+, 1 (10)
+4. RELATED WORK
+MpiBLAST [2] was proposed for clusters and has two
+phases. First, the genetic database is segmented. Then, the
+queries are evenly distributed among the nodes. If the node
+does not have a database fragment, a local copy is made. A
+method is proposed that associates data fragments to nodes,
+trying to minimize the number of copies.
+BLAST++ [10] groups multiple sequences to reduce the
+number of database accesses. A master/slave approach is
+used that allocates the queries to the slaves according to the
+fixed policy (section 3.3). Each worker executes BLAST++
+independently and, finally, the results are collected and 
+combined by the master.
+GridBlast [9] is a master/slave grid application that uses
+Globus 2. It distributes sequences among the grid nodes
+using two allocation policies: FCFS and minmax. Of those,
+only the last one takes into account the current load and the
+heterogeneity of the environment. However, to use minmax,
+the total execution time of each BLAST task must be known.
+Having decided which sequences will be compared by each
+node, GridBlast sends the sequences, the executable files and
+the whole database to the chosen node. When the search
+finishes, the results are compacted and sent to the master.
+Grid Blast Toolkit (GBTK) [12] is a web portal to execute
+BLAST searches in Globus 3. All genetic databases are 
+statically placed on the grid nodes (without replication). GBTK
+is a master/slave application that receives the sequences and
+the name of the genetic database. It then verifies if the node
+that contains the database is available. If so, it is selected.
+If the node is not available, the less loaded node is chosen
+and the database is copied to it.
+Master
+SlaveSlaveSlave
+Internet
+database
+segment
+but only part of it is processed in each node
+The database is replicated in the nodes,
+Figure 2: PackageBLAST segmentation and 
+distribution mechanism.
+5. DESIGN OF PACKAGEBLAST
+We propose an adaptive task allocation framework which
+is a grid service to perform BLAST searches against 
+sequence database segments. The framework, called 
+PackageBLAST, provides an infrastructure to choose or incorporate
+allocation strategies in a master/slave application. We also
+propose a strategy to compute grid nodes execution weight
+which distributes work units (database segments) to grid
+nodes according to their current computational power.
+5.1 Database Segmentation and Replication
+Segmentation consists in the division of a database archive
+in many portions of smaller size, called segments, that can
+be processed independently. It enables grid nodes to search
+smaller parts of a sequence database, reducing the number
+of disk accesses and hence improving BLAST performance.
+Also, a single query sequence can be compared against all
+segments in parallel. Just as in mpiBLAST (section 4),
+we decided to use database segmentation in PackageBLAST
+with an NCBI tool called formatdb, which was modified to
+generate more database segments of smaller size.
+We opted to replicate the segmented database in every
+slave grid node to improve data accesses times and to 
+provide a potential for fault tolerance. Figure 2 illustrates this.
+5.2 Task Allocation
+As [13], we think that no allocation policy will produce
+the best results for every situation. Thus, we propose the
+use of a framework where many allocation policies can be 
+incorporated. By now, our framework contains five allocation
+policies: Fixed, SS, GSS, TSS, FAC2, all described in 
+section 3. So, the user can choose or even create the allocation
+policy which is the most appropriate to his/her environment
+and his/her BLAST parameters.
+Besides that, we propose PSS (Package Weighted 
+Adaptive Self-Scheduling), a new strategy that adapts the chosen
+allocation policy to a grid with local workload. Considering
+the heterogeneity and dynamic characteristics of the grid,
+PSS is able to modify the length of the work units during
+execution, based on average processing time of each node.
+The expression used for work unit allocation is shown in
+equation 11, where A(N, P) is the allocation policy for a 
+system with N workload units and P nodes and Φ(m, pi, P) is
+the weight calculated by PSS. A(N, P) can be a pre-defined
+allocation policy or a user-defined one.
+158
+allocate(m, pi, N, P ) = A(N, P ) ∗ Φ(m, pi, P ) (11)
+To distribute database segments to nodes, the master 
+analyzes periodic slave notifications. The expression used is
+Φ(m, pi, P) (equation 12), defined as the weighted mean
+from the last Ω notifications sent by each pi slave node.
+Φ(m, pi, P ) =
+P ∗
+P
+i=1 Γ(m,pi,Ω)
+Γ(m,pi,Ω)
+P
+i=1
+P
+i=1
+Γ(m,pi,Ω)
+Γ(m,pi,Ω)
+(12)
+Γ(m, pi, Ω) (equation 13) specifies the average computing
+time of a segment in a node pi, considering the last Ω 
+notifications of TE(m, pi, τ), which is the average computation
+time of τ work units (database segments) assigned by the
+master m to a slave pi. At the moment of computation of
+Γ, if there is not enough notifications of TE, the calculation
+is done with total k notifications already received.
+Γ(m, pi, Ω) =
+min(Ω,k)
+j=1 T E(m, pi, τ)
+min(Ω, k)
+(13)
+5.3 PackageBLAST"s General Architecture
+PackageBLAST was designed as a grid service over Globus
+3, based on Web Services and Java. Figure 3 presents the
+PackageBLAST architecture.
+BLAST
+receives
+MASTER
+Strategies
+Allocation
+Work units
+Generate
+Work Units
+Distribute
+Reports
+Generate
+work units (to slaves)reports
+searches
+Figure 3: PackageBLAST architecture.
+The module Allocation Strategies contains 
+implementations for the pre-defined allocation policies (Fixed, SS, GSS,
+TSS and FAC2) and also makes possible the creation of new
+allocation strategies.
+The module Generate Work Units is the core of the PSS
+mechanism. It calculates the weight of each slave node and
+decides how many work units will be assigned to a particular
+slave node, according to the chosen allocation policy.
+Distribute Work Units is the module responsible for the
+communication between the master and slaves nodes. It
+distributes the work units generated by the previous module
+and collects the notifications.
+Finally, the module Generate Reports obtains the 
+intermediary outputs sent by the slave nodes through file transfer
+and merges them into a single BLAST output report.
+In general, the following execution flow is executed. The
+user specifies the sequence to be compared and chooses the
+allocation strategy. The master node starts execution and
+waits for slave connections. To start processing, a minimum
+number of slaves must register into the master node, by 
+calling a master grid service. After receiving connections from
+the slaves, the master notifies them about their initial 
+segments to compare. The slave processes τ database segments
+and notifies the master, which uses the last Ω notifications
+to compute the next allocation block size based on the 
+selected allocation strategy and the weight provided by PSS.
+Then, the master sends a XML message to the slave 
+informing its new segments to process. This flow continues until
+all segments are processed.
+6. EXPERIMENTAL RESULTS
+PackageBLAST was evaluated in a 16-node grid testbed,
+composed by two laboratories, interconnected by a 
+localarea network. Eleven desktops (P01-11) and a notebook
+(NB) were used in LABPOS and four desktops (L01-04)
+were used in LAICO (table 2). All grid nodes used Linux
+with Globus 3.2.1, NCBI BLAST 2.2.10 and Java VM 1.4.2.
+Table 2: Characteristics of the grid testbed.
+Node Names CPU Main Memory HD
+NB 3200 MHz 512 MB 80 GB
+L01-L03 1700 MHz 256 MB 30 GB
+L04 350 MHz 160 MB 6 GB
+P01-P10 1000 MHz 256 MB 20 GB
+P11 900 MHz 128 MB 20 GB
+To investigate the performance gains of PackageBLAST,
+we executed BLASTX in 2, 4, 8 and 16 grid nodes. Each
+BLAST search compared a 10KBP real DNA sequence against
+the 1.2GB nr genetic database segmented in 167 parts of
+5MB each. Fixed, SS, TSS, GSS and FAC2 allocation
+strategies were employed in the tests. Execution times for
+all allocation strategies are presented in table 3.
+Table 3: Execution times for BLASTX.
+Strategy 2 nodes 4 nodes 8 nodes 16 nodes
+FIXED 2037 999 491 252
+SS 1112 514 246 134
+TSS 1296 570 259 143
+GSS 1115 535 250 127
+FAC2 1187 514 266 142
+Table 4 presents execution times in a single machine and
+absolute speedups for 2, 4, 8 and 16 nodes, considering the
+best execution time for a given number of nodes. To 
+calculate the absolute speedups, the BLAST sequential version
+was executed with the nr unsegmented database.
+Table 4: Sequential execution times and speedups.
+Node SeqTime 2 nodes 4 nodes 8 nodes 16 nodes
+NB 1432 1.29 2.79 5.82 11.28
+L01 1585 1.43 3.08 6.44 12.48
+P01 1853 1.67 3.61 7.53 14.59
+P11 2004 1.80 3.90 8.15 15.78
+L04 3810 3.43 7.41 15.49 30.00
+PackageBLAST achieved very good speedups. 
+Considering the worst (L04), average (P01) and best (NB) node in
+the grid, the speedups obtained were superlinear, close to
+linear and sublinear, respectively.
+In table 3, it can also be noticed that there is no allocation
+strategy that always reaches the best execution time. This
+variation justifies the allocation framework provided.
+To evaluate PSS, we executed PackageBLAST with 16
+grid nodes, introducing local workload in nodes L01, L02,
+P01 and P02. The load was started simultaneously 30 
+seconds after the beginning of BLAST and consisted of the
+159
+execution of formatdb on the nr database. Three scenarios
+were simulated (table 5): 1) with PSS strategy, but without
+workload; 2) with PSS strategy and workload (PSS 2x), to
+use grid environment knowledge obtained in the preceeding
+iteration; and 3) Execution without PSS and with workload.
+Table 5: PSS evaluation with local workload. Gain
+is the comparison of without PSS with PSS 2x
+Strategy with PSS PSS 2x without PSS Gain
+Fixed 316 184 393 113.59%
+SS 186 177 179 1.13%
+TSS 160 162 171 5.56%
+GSS 149 159 339 113.21%
+FAC2 156 165 153 -7.27%
+As expected, the allocation strategies that assign a large
+amount of work to the nodes (fixed and GSS) obtained great
+benefit from using PSS. This is due to the fact that a slow
+node can easily become a bottleneck in these strategies. TSS
+also obtained a reduction of 5.56% in its execution time.
+PSS uses two parameters: τ and Ω (section 5.2). We 
+varied these parameters in order to evaluate the PSS behavior
+in two scenarios. In both cases, we used a four-node (NB,
+L01, P01, L04) grid. In the first experiment, a local 
+workload (formatdb) was introduced when the last task of the
+first TSS allocation starts and was stopped immediately 
+after the processing of one segment. The goal was to evaluate
+the impact of short-lived local tasks in PSS. In the second
+case, local workload was introduced at the same time of the
+previous case, but continued until the end. The goal was to
+evaluate long-lived local tasks. Figure 4 presents the gains.
+Figure 4: Percentual gain obtained by PSS varying
+τ and Ω parameters.
+In scenario 1, when a very recent history is considered
+(τ=1 and Ω=1), PSS tries to adapt to a situation that will
+shortly disappear. For τ=5 and Ω=4, PSS takes longer to
+notice modification and short-lived tasks have low impact.
+On the other hand, in scenario 2, τ=1,Ω=1 presents better
+results than τ=5, Ω=4, because it changes weights faster.
+7. CONCLUSION
+In this article, we proposed and evaluated PackageBLAST,
+an adaptive multi-policy grid service to execute master/slave
+BLAST searches. PackageBLAST contains a framework
+where the user can choose or incorporate allocation policies.
+We also defined a strategy, PSS, that adapts the chosen 
+policy to a heterogeneous non-dedicated grid environment.
+The results collected by running PackageBLAST with 5
+allocation policies in a grid testbed were very good. In 
+order to compare a 10KBP real DNA sequence against the
+nr genetic database, we were able to reduce execution time
+from 30.88 min to 2.11 min. Also, we showed that, in our
+testbed, there is no allocation policy that always achieves
+the best performance and that makes evident the 
+importance of providing multiple policies. Moreover, we showed
+that the introduction of PSS led to very good performance
+gains for some policies.
+As future work, we intend to run PackageBLAST in a 
+geographically dispersed grid, to evaluate the impact of high
+network latencies in the allocation policies and in PSS. Also,
+we intend to provide support for genomic database 
+synchronization and dynamic join/leave operations for slaves.
+8. REFERENCES
+[1] S. F. Altschul, W. Gish, W. Miller, E. W. Myers, and
+D. J. Lipman. A basic local alignment search tool.
+Journal of Molecular Biology, 215:403-410, 1990.
+[2] A. Darling, L. Carey, and W. Feng. The design,
+implementation, and evaluation of mpiblast. 4th
+International Conference on Linux Clusters, 2003.
+[3] S. F. A. et al. Gapped blast and psi-blast: a new
+generation of protein database search programs.
+Nucleic Acids Research, 25(17):3389-3402, 1997.
+[4] I. Foster and C. Kesselman. Globus: A metacomputing
+infrastructure toolkit. International Journal of
+Supercomputer Applications, 11(2):115-128, 1997.
+[5] I. Foster and C. Kesselman. The Grid: Blueprint of a
+Future Computing Infrastructure. Morgan-Kauffman,
+1999.
+[6] W. Gish. Washington university blast.
+http://blast.wustl.edu, 1996-2002.
+[7] D. Gusfield. Algorithms on Strings, Trees and
+Sequences. Cambridge University Press, 1997.
+[8] S. F. Hummel, E. Schonberg, and L. E. Flynn.
+Factoring: A method for scheduling parallel loops.
+Communications of the ACM, 35(8):90-101, 1992.
+[9] A. Krishnan. Gridblast: High throughput blast on the
+grid. Symposium on Biocomputing, January 2003.
+[10] D. Peng., W. Yan, and Z. Lei. Parallelization of
+blast++. Technical report, Singapore-MIT, 2004.
+[11] C. D. Polychronopoulos and D. J. Kuck. Guided
+self-scheduling: A practical scheduling scheme for
+parallel supercomputers. IEEE Transactions on
+Computers, 36(12):1425-1439, Dec. 1987.
+[12] M. K. Satish and R. R. Joshi. Gbtk: A toolkit for grid
+implementation of blast. 7th International Conference
+HPCAsia, pages 378-382, 2004.
+[13] G. Shao. Adaptive Scheduling of Master/Worker
+Applications on Distributed Computational Resources.
+PhD thesis, Univ. California at San Diego, 2001.
+[14] T. Smith and M. Waterman. Identification of common
+molecular subsequences. J. Mol. Biol., 147:195-197,
+1981.
+[15] P. Tang and P. C. Yew. Processor self-scheduling for
+multiple nested parallel loops. In Int. Conf. on
+Parallel Processing (ICPP), pages 528-535, 1986.
+[16] T. H. Tzen and L. M. Ni. Trapezoidal self-scheduling:
+A practical scheme for parallel compilers. IEEE
+Transactions on Parallel and Distributed Systems,
+4(1):87-98, Jan. 1993.
+160

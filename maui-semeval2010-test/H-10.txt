@@ -1,0 +1,1127 @@
+Regularized Clustering for Documents ∗
+Fei Wang, Changshui Zhang
+State Key Lab of Intelligent Tech. and Systems
+Department of Automation, Tsinghua University
+Beijing, China, 100084
+feiwang03@gmail.com
+Tao Li
+School of Computer Science
+Florida International University
+Miami, FL 33199, U.S.A.
+taoli@cs.fiu.edu
+ABSTRACT
+In recent years, document clustering has been receiving more
+and more attentions as an important and fundamental 
+technique for unsupervised document organization, automatic
+topic extraction, and fast information retrieval or filtering.
+In this paper, we propose a novel method for clustering 
+documents using regularization. Unlike traditional globally 
+regularized clustering methods, our method first construct a
+local regularized linear label predictor for each document
+vector, and then combine all those local regularizers with
+a global smoothness regularizer. So we call our algorithm
+Clustering with Local and Global Regularization (CLGR).
+We will show that the cluster memberships of the 
+documents can be achieved by eigenvalue decomposition of a
+sparse symmetric matrix, which can be efficiently solved by
+iterative methods. Finally our experimental evaluations on
+several datasets are presented to show the superiorities of
+CLGR over traditional document clustering methods.
+Categories and Subject Descriptors
+H.3.3 [Information Storage and Retrieval]: Information
+Search and Retrieval-Clustering; I.2.6 [Artificial 
+Intelligence]: Learning-Concept Learning
+General Terms
+Algorithms
+1. INTRODUCTION
+Document clustering has been receiving more and more
+attentions as an important and fundamental technique for
+unsupervised document organization, automatic topic 
+extraction, and fast information retrieval or filtering. A good
+document clustering approach can assist the computers to
+automatically organize the document corpus into a 
+meaningful cluster hierarchy for efficient browsing and navigation,
+which is very valuable for complementing the deficiencies of
+traditional information retrieval technologies. As pointed
+out by [8], the information retrieval needs can be expressed
+by a spectrum ranged from narrow keyword-matching based
+search to broad information browsing such as what are the
+major international events in recent months. Traditional
+document retrieval engines tend to fit well with the search
+end of the spectrum, i.e. they usually provide specified
+search for documents matching the user"s query, however,
+it is hard for them to meet the needs from the rest of the
+spectrum in which a rather broad or vague information is
+needed. In such cases, efficient browsing through a good
+cluster hierarchy will be definitely helpful.
+Generally, document clustering methods can be mainly
+categorized into two classes: hierarchical methods and 
+partitioning methods. The hierarchical methods group the data
+points into a hierarchical tree structure using bottom-up or
+top-down approaches. For example, hierarchical 
+agglomerative clustering (HAC) [13] is a typical bottom-up 
+hierarchical clustering method. It takes each data point as a single
+cluster to start off with and then builds bigger and bigger
+clusters by grouping similar data points together until the
+entire dataset is encapsulated into one final cluster. On the
+other hand, partitioning methods decompose the dataset
+into a number of disjoint clusters which are usually 
+optimal in terms of some predefined criterion functions. For 
+instance, K-means [13] is a typical partitioning method which
+aims to minimize the sum of the squared distance between
+the data points and their corresponding cluster centers. In
+this paper, we will focus on the partitioning methods.
+As we know that there are two main problems existing
+in partitioning methods (like Kmeans and Gaussian 
+Mixture Model (GMM) [16]): (1) the predefined criterion is 
+usually non-convex which causes many local optimal solutions;
+(2) the iterative procedure (e.g. the Expectation 
+Maximization (EM) algorithm) for optimizing the criterions usually
+makes the final solutions heavily depend on the 
+initializations. In the last decades, many methods have been 
+proposed to overcome the above problems of the partitioning
+methods [19][28].
+Recently, another type of partitioning methods based on
+clustering on data graphs have aroused considerable 
+interests in the machine learning and data mining community.
+The basic idea behind these methods is to first model the
+whole dataset as a weighted graph, in which the graph nodes
+represent the data points, and the weights on the edges 
+correspond to the similarities between pairwise points. Then
+the cluster assignments of the dataset can be achieved by
+optimizing some criterions defined on the graph. For 
+example Spectral Clustering is one kind of the most representative
+graph-based clustering approaches, it generally aims to 
+optimize some cut value (e.g. Normalized Cut [22], Ratio Cut [7],
+Min-Max Cut [11]) defined on an undirected graph. After
+some relaxations, these criterions can usually be optimized
+via eigen-decompositions, which is guaranteed to be global
+optimal. In this way, spectral clustering efficiently avoids
+the problems of the traditional partitioning methods as we
+introduced in last paragraph.
+In this paper, we propose a novel document clustering 
+algorithm that inherits the superiority of spectral clustering,
+i.e. the final cluster results can also be obtained by exploit
+the eigen-structure of a symmetric matrix. However, unlike
+spectral clustering, which just enforces a smoothness 
+constraint on the data labels over the whole data manifold [2],
+our method first construct a regularized linear label 
+predictor for each data point from its neighborhood as in [25],
+and then combine the results of all these local label 
+predictors with a global label smoothness regularizer. So we call
+our method Clustering with Local and Global Regularization
+(CLGR). The idea of incorporating both local and global
+information into label prediction is inspired by the recent
+works on semi-supervised learning [31], and our 
+experimental evaluations on several real document datasets show that
+CLGR performs better than many state-of-the-art clustering
+methods.
+The rest of this paper is organized as follows: in section 2
+we will introduce our CLGR algorithm in detail. The 
+experimental results on several datasets are presented in section
+3, followed by the conclusions and discussions in section 4.
+2. THE PROPOSED ALGORITHM
+In this section, we will introduce our Clustering with Local
+and Global Regularization (CLGR) algorithm in detail. First
+let"s see the how the documents are represented throughout
+this paper.
+2.1 Document Representation
+In our work, all the documents are represented by the
+weighted term-frequency vectors. Let W = {w1, w2, · · · , wm}
+be the complete vocabulary set of the document corpus
+(which is preprocessed by the stopwords removal and words
+stemming operations). The term-frequency vector xi of 
+document di is defined as
+xi = [xi1, xi2, · · · , xim]T
+, xik = tik log
+n
+idfk
+,
+where tik is the term frequency of wk ∈ W, n is the size
+of the document corpus, idfk is the number of documents
+that contain word wk. In this way, xi is also called the 
+TFIDF representation of document di. Furthermore, we also
+normalize each xi (1 i n) to have a unit length, so
+that each document is represented by a normalized TF-IDF
+vector.
+2.2 Local Regularization
+As its name suggests, CLGR is composed of two parts:
+local regularization and global regularization. In this 
+subsection we will introduce the local regularization part in detail.
+2.2.1 Motivation
+As we know that clustering is one type of learning 
+techniques, it aims to organize the dataset in a reasonable way.
+Generally speaking, learning can be posed as a problem of
+function estimation, from which we can get a good 
+classification function that will assign labels to the training dataset
+and even the unseen testing dataset with some cost 
+minimized [24]. For example, in the two-class classification 
+scenario1
+(in which we exactly know the label of each 
+document), a linear classifier with least square fit aims to learn
+a column vector w such that the squared cost
+J =
+1
+n
+(wT
+xi − yi)2
+(1)
+is minimized, where yi ∈ {+1, −1} is the label of xi. By
+taking ∂J /∂w = 0, we get the solution
+w∗
+=
+n
+i=1
+xixT
+i
+−1 n
+i=1
+xiyi , (2)
+which can further be written in its matrix form as
+w∗
+= XXT
+−1
+Xy, (3)
+where X = [x1, x2, · · · , xn] is an m × n document matrix,
+y = [y1, y2, · · · , yn]T
+is the label vector. Then for a test
+document t, we can determine its label by
+l = sign(w∗T
+u), (4)
+where sign(·) is the sign function.
+A natural problem in Eq.(3) is that the matrix XXT
+may
+be singular and thus not invertable (e.g. when m n). To
+avoid such a problem, we can add a regularization term and
+minimize the following criterion
+J =
+1
+n
+n
+i=1
+(wT
+xi − yi)2
++ λ w 2
+, (5)
+where λ is a regularization parameter. Then the optimal
+solution that minimize J is given by
+w∗
+= XXT
++ λnI
+−1
+Xy, (6)
+where I is an m × m identity matrix. It has been reported
+that the regularized linear classifier can achieve very good
+results on text classification problems [29].
+However, despite its empirical success, the regularized 
+linear classifier is on earth a global classifier, i.e. w∗
+is 
+estimated using the whole training set. According to [24], this
+may not be a smart idea, since a unique w∗
+may not be good
+enough for predicting the labels of the whole input space. In
+order to get better predictions, [6] proposed to train 
+classifiers locally and use them to classify the testing points. For
+example, a testing point will be classified by the local 
+classifier trained using the training points located in the vicinity
+1
+In the following discussions we all assume that the 
+documents coming from only two classes. The generalizations of
+our method to multi-class cases will be discussed in section
+2.5.
+of it. Although this method seems slow and stupid, it is
+reported that it can get better performances than using a
+unique global classifier on certain tasks [6].
+2.2.2 Constructing the Local Regularized Predictors
+Inspired by their success, we proposed to apply the local
+learning algorithms for clustering. The basic idea is that, for
+each document vector xi (1 i n), we train a local label
+predictor based on its k-nearest neighborhood Ni, and then
+use it to predict the label of xi. Finally we will combine
+all those local predictors by minimizing the sum of their
+prediction errors. In this subsection we will introduce how
+to construct those local predictors.
+Due to the simplicity and effectiveness of the regularized
+linear classifier that we have introduced in section 2.2.1, we
+choose it to be our local label predictor, such that for each
+document xi, the following criterion is minimized
+Ji =
+1
+ni
+xj ∈Ni
+wT
+i xj − qj
+2
++ λi wi
+2
+, (7)
+where ni = |Ni| is the cardinality of Ni, and qj is the 
+cluster membership of xj. Then using Eq.(6), we can get the
+optimal solution is
+w∗
+i = XiXT
+i + λiniI
+−1
+Xiqi, (8)
+where Xi = [xi1, xi2, · · · , xini ], and we use xik to denote the
+k-th nearest neighbor of xi. qi = [qi1, qi2, · · · , qini ]T
+with
+qik representing the cluster assignment of xik. The problem
+here is that XiXT
+i is an m × m matrix with m ni, i.e.
+we should compute the inverse of an m × m matrix for 
+every document vector, which is computationally prohibited.
+Fortunately, we have the following theorem:
+Theorem 1. w∗
+i in Eq.(8) can be rewritten as
+w∗
+i = Xi XT
+i Xi + λiniIi
+−1
+qi, (9)
+where Ii is an ni × ni identity matrix.
+Proof. Since
+w∗
+i = XiXT
+i + λiniI
+−1
+Xiqi,
+then
+XiXT
+i + λiniI w∗
+i = Xiqi
+=⇒ XiXT
+i w∗
+i + λiniw∗
+i = Xiqi
+=⇒ w∗
+i = (λini)−1
+Xi qi − XT
+i w∗
+i .
+Let
+β = (λini)−1
+qi − XT
+i w∗
+i ,
+then
+w∗
+i = Xiβ
+=⇒ λiniβ = qi − XT
+i w∗
+i = qi − XT
+i Xiβ
+=⇒ qi = XT
+i Xi + λiniIi β
+=⇒ β = XT
+i Xi + λiniIi
+−1
+qi.
+Therefore
+w∗
+i = Xiβ = Xi XT
+i Xi + λiniIi
+−1
+qi 2
+Using theorem 1, we only need to compute the inverse of
+an ni × ni matrix for every document to train a local label
+predictor. Moreover, for a new testing point u that falls into
+Ni, we can classify it by the sign of
+qu = w∗T
+i u = uT
+wi = uT
+Xi XT
+i Xi + λiniIi
+−1
+qi.
+This is an attractive expression since we can determine the
+cluster assignment of u by using the inner-products between
+the points in {u ∪ Ni}, which suggests that such a local
+regularizer can easily be kernelized [21] as long as we define
+a proper kernel function.
+2.2.3 Combining the Local Regularized Predictors
+After all the local predictors having been constructed, we
+will combine them together by minimizing
+Jl =
+n
+i=1
+w∗T
+i xi − qi
+2
+, (10)
+which stands for the sum of the prediction errors for all the
+local predictors. Combining Eq.(10) with Eq.(6), we can get
+Jl =
+n
+i=1
+w∗T
+i xi − qi
+2
+=
+n
+i=1
+xT
+i Xi XT
+i Xi + λiniIi
+−1
+qi − qi
+2
+= Pq − q 2
+, (11)
+where q = [q1, q2, · · · , qn]T
+, and the P is an n × n matrix
+constructing in the following way. Let
+αi
+= xT
+i Xi XT
+i Xi + λiniIi
+−1
+,
+then
+Pij =
+αi
+j, if xj ∈ Ni
+0, otherwise
+, (12)
+where Pij is the (i, j)-th entry of P, and αi
+j represents the
+j-th entry of αi
+.
+Till now we can write the criterion of clustering by 
+combining locally regularized linear label predictors Jl in an
+explicit mathematical form, and we can minimize it directly
+using some standard optimization techniques. However, the
+results may not be good enough since we only exploit the
+local informations of the dataset. In the next subsection, we
+will introduce a global regularization criterion and combine
+it with Jl, which aims to find a good clustering result in a
+local-global way.
+2.3 Global Regularization
+In data clustering, we usually require that the cluster 
+assignments of the data points should be sufficiently smooth
+with respect to the underlying data manifold, which implies
+(1) the nearby points tend to have the same cluster 
+assignments; (2) the points on the same structure (e.g. 
+submanifold or cluster) tend to have the same cluster assignments
+[31].
+Without the loss of generality, we assume that the data
+points reside (roughly) on a low-dimensional manifold M2
+,
+and q is the cluster assignment function defined on M, i.e.
+2
+We believe that the text data are also sampled from some
+low dimensional manifold, since it is impossible for them to
+for ∀x ∈ M, q(x) returns the cluster membership of x. The
+smoothness of q over M can be calculated by the following
+Dirichlet integral [2]
+D[q] =
+1
+2 M
+q(x) 2
+dM, (13)
+where the gradient q is a vector in the tangent space T Mx,
+and the integral is taken with respect to the standard 
+measure on M. If we restrict the scale of q by q, q M = 1
+(where ·, · M is the inner product induced on M), then
+it turns out that finding the smoothest function 
+minimizing D[q] reduces to finding the eigenfunctions of the Laplace
+Beltrami operator L, which is defined as
+Lq −div q, (14)
+where div is the divergence of a vector field.
+Generally, the graph can be viewed as the discretized form
+of manifold. We can model the dataset as an weighted 
+undirected graph as in spectral clustering [22], where the graph
+nodes are just the data points, and the weights on the edges
+represent the similarities between pairwise points. Then it
+can be shown that minimizing Eq.(13) corresponds to 
+minimizing
+Jg = qT
+Lq =
+n
+i=1
+(qi − qj)2
+wij, (15)
+where q = [q1, q2, · · · , qn]T
+with qi = q(xi), L is the graph
+Laplacian with its (i, j)-th entry
+Lij =
+
+
+
+di − wii, if i = j
+−wij, if xi and xj are adjacent
+0, otherwise,
+(16)
+where di = j wij is the degree of xi, wij is the similarity
+between xi and xj. If xi and xj are adjacent3
+, wij is usually
+computed in the following way
+wij = e
+−
+xi−xj
+2
+2σ2 , (17)
+where σ is a dataset dependent parameter. It is proved that
+under certain conditions, such a form of wij to determine
+the weights on graph edges leads to the convergence of graph
+Laplacian to the Laplace Beltrami operator [3][18].
+In summary, using Eq.(15) with exponential weights can
+effectively measure the smoothness of the data assignments
+with respect to the intrinsic data manifold. Thus we adopt
+it as a global regularizer to punish the smoothness of the
+predicted data assignments.
+2.4 Clustering with Local and Global
+Regularization
+Combining the contents we have introduced in section 2.2
+and section 2.3 we can derive the clustering criterion is
+minq J = Jl + λJg = Pq − q 2
++ λqT
+Lq
+s.t. qi ∈ {−1, +1}, (18)
+where P is defined as in Eq.(12), and λ is a regularization
+parameter to trade off Jl and Jg. However, the discrete
+fill in the whole high-dimensional sample space. And it has
+been shown that the manifold based methods can achieve
+good results on text classification tasks [31].
+3
+In this paper, we define xi and xj to be adjacent if xi ∈
+N(xj) or xj ∈ N(xi).
+constraint of pi makes the problem an NP hard integer 
+programming problem. A natural way for making the problem
+solvable is to remove the constraint and relax qi to be 
+continuous, then the objective that we aims to minimize becomes
+J = Pq − q 2
++ λqT
+Lq
+= qT
+(P − I)T
+(P − I)q + λqT
+Lq
+= qT
+(P − I)T
+(P − I) + λL q, (19)
+and we further add a constraint qT
+q = 1 to restrict the scale
+of q. Then our objective becomes
+minq J = qT
+(P − I)T
+(P − I) + λL q
+s.t. qT
+q = 1 (20)
+Using the Lagrangian method, we can derive that the 
+optimal solution q corresponds to the smallest eigenvector of
+the matrix M = (P − I)T
+(P − I) + λL, and the cluster 
+assignment of xi can be determined by the sign of qi, i.e. xi
+will be classified as class one if qi > 0, otherwise it will be
+classified as class 2.
+2.5 Multi-Class CLGR
+In the above we have introduced the basic framework of
+Clustering with Local and Global Regularization (CLGR) for
+the two-class clustering problem, and we will extending it
+to multi-class clustering in this subsection.
+First we assume that all the documents belong to C classes
+indexed by L = {1, 2, · · · , C}. qc
+is the classification 
+function for class c (1 c C), such that qc
+(xi) returns the
+confidence that xi belongs to class c. Our goal is to obtain
+the value of qc
+(xi) (1 c C, 1 i n), and the cluster
+assignment of xi can be determined by {qc
+(xi)}C
+c=1 using
+some proper discretization methods that we will introduce
+later.
+Therefore, in this multi-class case, for each document xi (1
+i n), we will construct C locally linear regularized label
+predictors whose normal vectors are
+wc∗
+i = Xi XT
+i Xi + λiniIi
+−1
+qc
+i (1 c C), (21)
+where Xi = [xi1, xi2, · · · , xini ] with xik being the k-th 
+neighbor of xi, and qc
+i = [qc
+i1, qc
+i2, · · · , qc
+ini
+]T
+with qc
+ik = qc
+(xik).
+Then (wc∗
+i )T
+xi returns the predicted confidence of xi 
+belonging to class c. Hence the local prediction error for class
+c can be defined as
+J c
+l =
+n
+i=1
+(wc∗
+i )
+T
+xi − qc
+i
+2
+, (22)
+And the total local prediction error becomes
+Jl =
+C
+c=1
+J c
+l =
+C
+c=1
+n
+i=1
+(wc∗
+i )
+T
+xi − qc
+i
+2
+. (23)
+As in Eq.(11), we can define an n×n matrix P (see Eq.(12))
+and rewrite Jl as
+Jl =
+C
+c=1
+J c
+l =
+C
+c=1
+Pqc
+− qc 2
+. (24)
+Similarly we can define the global smoothness regularizer
+in multi-class case as
+Jg =
+C
+c=1
+n
+i=1
+(qc
+i − qc
+j )2
+wij =
+C
+c=1
+(qc
+)T
+Lqc
+. (25)
+Then the criterion to be minimized for CLGR in multi-class
+case becomes
+J = Jl + λJg
+=
+C
+c=1
+Pqc
+− qc 2
++ λ(qc
+)T
+Lqc
+=
+C
+c=1
+(qc
+)T
+(P − I)T
+(P − I) + λL qc
+= trace QT
+(P − I)T
+(P − I) + λL Q , (26)
+where Q = [q1
+, q2
+, · · · , qc
+] is an n × c matrix, and trace(·)
+returns the trace of a matrix. The same as in Eq.(20), we
+also add the constraint that QT
+Q = I to restrict the scale
+of Q. Then our optimization problem becomes
+minQ J = trace QT
+(P − I)T
+(P − I) + λL Q
+s.t. QT
+Q = I, (27)
+From the Ky Fan theorem [28], we know the optimal solution
+of the above problem is
+Q∗
+= [q∗
+1, q∗
+2, · · · , q∗
+C ]R, (28)
+where q∗
+k (1 k C) is the eigenvector corresponds to the
+k-th smallest eigenvalue of matrix (P − I)T
+(P − I) + λL,
+and R is an arbitrary C × C matrix. Since the values of the
+entries in Q∗
+is continuous, we need to further discretize Q∗
+to get the cluster assignments of all the data points. There
+are mainly two approaches to achieve this goal:
+1. As in [20], we can treat the i-th row of Q as the 
+embedding of xi in a C-dimensional space, and apply some
+traditional clustering methods like kmeans to 
+clustering these embeddings into C clusters.
+2. Since the optimal Q∗
+is not unique (because of the
+existence of an arbitrary matrix R), we can pursue an
+optimal R that will rotate Q∗
+to an indication matrix4
+.
+The detailed algorithm can be referred to [26].
+The detailed algorithm procedure for CLGR is summarized
+in table 1.
+3. EXPERIMENTS
+In this section, experiments are conducted to empirically
+compare the clustering results of CLGR with other 8 
+representitive document clustering algorithms on 5 datasets.
+First we will introduce the basic informations of those datasets.
+3.1 Datasets
+We use a variety of datasets, most of which are frequently
+used in the information retrieval research. Table 2 
+summarizes the characteristics of the datasets.
+4
+Here an indication matrix T is a n×c matrix with its (i, 
+j)th entry Tij ∈ {0, 1} such that for each row of Q∗
+there is
+only one 1. Then the xi can be assigned to the j-th cluster
+such that j = argjQ∗
+ij = 1.
+Table 1: Clustering with Local and Global 
+Regularization (CLGR)
+Input:
+1. Dataset X = {xi}n
+i=1;
+2. Number of clusters C;
+3. Size of the neighborhood K;
+4. Local regularization parameters {λi}n
+i=1;
+5. Global regularization parameter λ;
+Output:
+The cluster membership of each data point.
+Procedure:
+1. Construct the K nearest neighborhoods for each
+data point;
+2. Construct the matrix P using Eq.(12);
+3. Construct the Laplacian matrix L using Eq.(16);
+4. Construct the matrix M = (P − I)T
+(P − I) + λL;
+5. Do eigenvalue decomposition on M, and construct
+the matrix Q∗
+according to Eq.(28);
+6. Output the cluster assignments of each data point
+by properly discretize Q∗
+.
+Table 2: Descriptions of the document datasets
+Datasets Number of documents Number of classes
+CSTR 476 4
+WebKB4 4199 4
+Reuters 2900 10
+WebACE 2340 20
+Newsgroup4 3970 4
+CSTR. This is the dataset of the abstracts of technical
+reports published in the Department of Computer Science
+at a university. The dataset contained 476 abstracts, which
+were divided into four research areas: Natural Language
+Processing(NLP), Robotics/Vision, Systems, and Theory.
+WebKB. The WebKB dataset contains webpages 
+gathered from university computer science departments. There
+are about 8280 documents and they are divided into 7 
+categories: student, faculty, staff, course, project, department
+and other. The raw text is about 27MB. Among these
+7 categories, student, faculty, course and project are four
+most populous entity-representing categories. The 
+associated subset is typically called WebKB4.
+Reuters. The Reuters-21578 Text Categorization Test
+collection contains documents collected from the Reuters
+newswire in 1987. It is a standard text categorization 
+benchmark and contains 135 categories. In our experiments, we
+use a subset of the data collection which includes the 10
+most frequent categories among the 135 topics and we call
+it Reuters-top 10.
+WebACE. The WebACE dataset was from WebACE project
+and has been used for document clustering [17][5]. The 
+WebACE dataset contains 2340 documents consisting news 
+articles from Reuters new service via the Web in October 1997.
+These documents are divided into 20 classes.
+News4. The News4 dataset used in our experiments are
+selected from the famous 20-newsgroups dataset5
+. The topic
+rec containing autos, motorcycles, baseball and hockey was
+selected from the version 20news-18828. The News4 dataset
+contains 3970 document vectors.
+5
+http://people.csail.mit.edu/jrennie/20Newsgroups/
+To pre-process the datasets, we remove the stop words
+using a standard stop list, all HTML tags are skipped and all
+header fields except subject and organization of the posted
+articles are ignored. In all our experiments, we first select
+the top 1000 words by mutual information with class labels.
+3.2 Evaluation Metrics
+In the experiments, we set the number of clusters equal
+to the true number of classes C for all the clustering 
+algorithms. To evaluate their performance, we compare the
+clusters generated by these algorithms with the true classes
+by computing the following two performance measures.
+Clustering Accuracy (Acc). The first performance 
+measure is the Clustering Accuracy, which discovers the 
+one-toone relationship between clusters and classes and measures
+the extent to which each cluster contained data points from
+the corresponding class. It sums up the whole matching 
+degree between all pair class-clusters. Clustering accuracy can
+be computed as:
+Acc =
+1
+N
+max
+
+
+Ck,Lm
+T(Ck, Lm)
+
+ , (29)
+where Ck denotes the k-th cluster in the final results, and Lm
+is the true m-th class. T(Ck, Lm) is the number of entities
+which belong to class m are assigned to cluster k. 
+Accuracy computes the maximum sum of T(Ck, Lm) for all pairs
+of clusters and classes, and these pairs have no overlaps.
+The greater clustering accuracy means the better clustering
+performance.
+Normalized Mutual Information (NMI). Another 
+evaluation metric we adopt here is the Normalized Mutual 
+Information NMI [23], which is widely used for determining
+the quality of clusters. For two random variable X and Y,
+the NMI is defined as:
+NMI(X, Y) =
+I(X, Y)
+H(X)H(Y)
+, (30)
+where I(X, Y) is the mutual information between X and
+Y, while H(X) and H(Y) are the entropies of X and Y
+respectively. One can see that NMI(X, X) = 1, which is the
+maximal possible value of NMI. Given a clustering result,
+the NMI in Eq.(30) is estimated as
+NMI =
+C
+k=1
+C
+m=1 nk,mlog
+n·nk,m
+nk ˆnm
+C
+k=1 nklog nk
+n
+C
+m=1 ˆnmlog ˆnm
+n
+, (31)
+where nk denotes the number of data contained in the cluster
+Ck (1 k C), ˆnm is the number of data belonging to the
+m-th class (1 m C), and nk,m denotes the number of
+data that are in the intersection between the cluster Ck and
+the m-th class. The value calculated in Eq.(31) is used as
+a performance measure for the given clustering result. The
+larger this value, the better the clustering performance.
+3.3 Comparisons
+We have conducted comprehensive performance 
+evaluations by testing our method and comparing it with 8 other
+representative data clustering methods using the same data
+corpora. The algorithms that we evaluated are listed below.
+1. Traditional k-means (KM).
+2. Spherical k-means (SKM). The implementation is based
+on [9].
+3. Gaussian Mixture Model (GMM). The implementation
+is based on [16].
+4. Spectral Clustering with Normalized Cuts (Ncut). The
+implementation is based on [26], and the variance of
+the Gaussian similarity is determined by Local Scaling
+[30]. Note that the criterion that Ncut aims to 
+minimize is just the global regularizer in our CLGR 
+algorithm except that Ncut used the normalized Laplacian.
+5. Clustering using Pure Local Regularization (CPLR).
+In this method we just minimize Jl (defined in Eq.(24)),
+and the clustering results can be obtained by doing
+eigenvalue decomposition on matrix (I − P)T
+(I − P)
+with some proper discretization methods.
+6. Adaptive Subspace Iteration (ASI). The 
+implementation is based on [14].
+7. Nonnegative Matrix Factorization (NMF). The 
+implementation is based on [27].
+8. Tri-Factorization Nonnegative Matrix Factorization
+(TNMF) [12]. The implementation is based on [15].
+For computational efficiency, in the implementation of
+CPLR and our CLGR algorithm, we have set all the local
+regularization parameters {λi}n
+i=1 to be identical, which is
+set by grid search from {0.1, 1, 10}. The size of the k-nearest
+neighborhoods is set by grid search from {20, 40, 80}. For
+the CLGR method, its global regularization parameter is
+set by grid search from {0.1, 1, 10}. When constructing the
+global regularizer, we have adopted the local scaling method
+[30] to construct the Laplacian matrix. The final 
+discretization method adopted in these two methods is the same as
+in [26], since our experiments show that using such method
+can achieve better results than using kmeans based methods
+as in [20].
+3.4 Experimental Results
+The clustering accuracies comparison results are shown in
+table 3, and the normalized mutual information comparison
+results are summarized in table 4. From the two tables we
+mainly observe that:
+1. Our CLGR method outperforms all other document
+clustering methods in most of the datasets;
+2. For document clustering, the Spherical k-means method
+usually outperforms the traditional k-means clustering
+method, and the GMM method can achieve 
+competitive results compared to the Spherical k-means method;
+3. The results achieved from the k-means and GMM type
+algorithms are usually worse than the results achieved
+from Spectral Clustering. Since Spectral Clustering can
+be viewed as a weighted version of kernel k-means, it
+can obtain good results the data clusters are arbitrarily
+shaped. This corroborates that the documents vectors
+are not regularly distributed (spherical or elliptical).
+4. The experimental comparisons empirically verify the
+equivalence between NMF and Spectral Clustering, which
+Table 3: Clustering accuracies of the various 
+methods
+CSTR WebKB4 Reuters WebACE News4
+KM 0.4256 0.3888 0.4448 0.4001 0.3527
+SKM 0.4690 0.4318 0.5025 0.4458 0.3912
+GMM 0.4487 0.4271 0.4897 0.4521 0.3844
+NMF 0.5713 0.4418 0.4947 0.4761 0.4213
+Ncut 0.5435 0.4521 0.4896 0.4513 0.4189
+ASI 0.5621 0.4752 0.5235 0.4823 0.4335
+TNMF 0.6040 0.4832 0.5541 0.5102 0.4613
+CPLR 0.5974 0.5020 0.4832 0.5213 0.4890
+CLGR 0.6235 0.5228 0.5341 0.5376 0.5102
+Table 4: Normalized mutual information results of
+the various methods
+CSTR WebKB4 Reuters WebACE News4
+KM 0.3675 0.3023 0.4012 0.3864 0.3318
+SKM 0.4027 0.4155 0.4587 0.4003 0.4085
+GMM 0.4034 0.4093 0.4356 0.4209 0.3994
+NMF 0.5235 0.4517 0.4402 0.4359 0.4130
+Ncut 0.4833 0.4497 0.4392 0.4289 0.4231
+ASI 0.5008 0.4833 0.4769 0.4817 0.4503
+TNMF 0.5724 0.5011 0.5132 0.5328 0.4749
+CPLR 0.5695 0.5231 0.4402 0.5543 0.4690
+CLGR 0.6012 0.5434 0.4935 0.5390 0.4908
+has been proved theoretically in [10]. It can be 
+observed from the tables that NMF and Spectral 
+Clustering usually lead to similar clustering results.
+5. The co-clustering based methods (TNMF and ASI)
+can usually achieve better results than traditional purely
+document vector based methods. Since these methods
+perform an implicit feature selection at each iteration,
+provide an adaptive metric for measuring the 
+neighborhood, and thus tend to yield better clustering results.
+6. The results achieved from CPLR are usually better
+than the results achieved from Spectral Clustering, which
+supports Vapnik"s theory [24] that sometimes local
+learning algorithms can obtain better results than global
+learning algorithms.
+Besides the above comparison experiments, we also test
+the parameter sensibility of our method. There are mainly
+two sets of parameters in our CLGR algorithm, the local
+and global regularization parameters ({λi}n
+i=1 and λ, as we
+have said in section 3.3, we have set all λi"s to be identical to
+λ∗
+in our experiments), and the size of the neighborhoods.
+Therefore we have also done two sets of experiments:
+1. Fixing the size of the neighborhoods, and testing the
+clustering performance with varying λ∗
+and λ. In this
+set of experiments, we find that our CLGR algorithm
+can achieve good results when the two regularization
+parameters are neither too large nor too small. 
+Typically our method can achieve good results when λ∗
+and λ are around 0.1. Figure 1 shows us such a 
+testing example on the WebACE dataset.
+2. Fixing the local and global regularization parameters,
+and testing the clustering performance with different
+−5
+−4.5
+−4
+−3.5
+−3
+−5
+−4.5
+−4
+−3.5
+−3
+0.35
+0.4
+0.45
+0.5
+0.55
+local regularization para
+(log
+2
+value)
+global regularization para
+(log
+2
+value)
+clusteringaccuracy
+Figure 1: Parameter sensibility testing results on
+the WebACE dataset with the neighborhood size
+fixed to 20, and the x-axis and y-axis represents the
+log2 value of λ∗
+and λ.
+sizes of neighborhoods. In this set of experiments,
+we find that the neighborhood with a too large or
+too small size will all deteriorate the final clustering
+results. This can be easily understood since when
+the neighborhood size is very small, then the data
+points used for training the local classifiers may not
+be sufficient; when the neighborhood size is very large,
+the trained classifiers will tend to be global and 
+cannot capture the typical local characteristics. Figure 2
+shows us a testing example on the WebACE dataset.
+Therefore, we can see that our CLGR algorithm (1) can
+achieve satisfactory results and (2) is not very sensitive to
+the choice of parameters, which makes it practical in real
+world applications.
+4. CONCLUSIONS AND FUTURE WORKS
+In this paper, we derived a new clustering algorithm called
+clustering with local and global regularization. Our method
+preserves the merit of local learning algorithms and spectral
+clustering. Our experiments show that the proposed 
+algorithm outperforms most of the state of the art algorithms on
+many benchmark datasets. In the future, we will focus on
+the parameter selection and acceleration issues of the CLGR
+algorithm.
+5. REFERENCES
+[1] L. Baker and A. McCallum. Distributional Clustering
+of Words for Text Classification. In Proceedings of the
+International ACM SIGIR Conference on Research
+and Development in Information Retrieval, 1998.
+[2] M. Belkin and P. Niyogi. Laplacian Eigenmaps for
+Dimensionality Reduction and Data Representation.
+Neural Computation, 15 (6):1373-1396. June 2003.
+[3] M. Belkin and P. Niyogi. Towards a Theoretical
+Foundation for Laplacian-Based Manifold Methods. In
+Proceedings of the 18th Conference on Learning
+Theory (COLT). 2005.
+10 20 30 40 50 60 70 80 90 100
+0.35
+0.4
+0.45
+0.5
+0.55
+size of the neighborhood
+clusteringaccuracy
+Figure 2: Parameter sensibility testing results on
+the WebACE dataset with the regularization 
+parameters being fixed to 0.1, and the neighborhood size
+varing from 10 to 100.
+[4] M. Belkin, P. Niyogi and V. Sindhwani. Manifold
+Regularization: a Geometric Framework for Learning
+from Examples. Journal of Machine Learning
+Research 7, 1-48, 2006.
+[5] D. Boley. Principal Direction Divisive Partitioning.
+Data mining and knowledge discovery, 2:325-344, 1998.
+[6] L. Bottou and V. Vapnik. Local learning algorithms.
+Neural Computation, 4:888-900, 1992.
+[7] P. K. Chan, D. F. Schlag and J. Y. Zien. Spectral
+K-way Ratio-Cut Partitioning and Clustering. IEEE
+Trans. Computer-Aided Design, 13:1088-1096, Sep.
+1994.
+[8] D. R. Cutting, D. R. Karger, J. O. Pederson and J.
+W. Tukey. Scatter/Gather: A Cluster-Based Approach
+to Browsing Large Document Collections. In
+Proceedings of the International ACM SIGIR
+Conference on Research and Development in
+Information Retrieval, 1992.
+[9] I. S. Dhillon and D. S. Modha. Concept
+Decompositions for Large Sparse Text Data using
+Clustering. Machine Learning, vol. 42(1), pages
+143-175, January 2001.
+[10] C. Ding, X. He, and H. Simon. On the equivalence of
+nonnegative matrix factorization and spectral
+clustering. In Proceedings of the SIAM Data Mining
+Conference, 2005.
+[11] C. Ding, X. He, H. Zha, M. Gu, and H. D. Simon. A
+min-max cut algorithm for graph partitioning and
+data clustering. In Proc. of the 1st International
+Conference on Data Mining (ICDM), pages 107-114,
+2001.
+[12] C. Ding, T. Li, W. Peng, and H. Park. Orthogonal
+Nonnegative Matrix Tri-Factorizations for Clustering.
+In Proceedings of the Twelfth ACM SIGKDD
+International Conference on Knowledge Discovery and
+Data Mining, 2006.
+[13] R. O. Duda, P. E. Hart, and D. G. Stork. Pattern
+Classification. John Wiley & Sons, Inc., 2001.
+[14] T. Li, S. Ma, and M. Ogihara. Document Clustering
+via Adaptive Subspace Iteration. In Proceedings of the
+International ACM SIGIR Conference on Research
+and Development in Information Retrieval, 2004.
+[15] T. Li and C. Ding. The Relationships Among Various
+Nonnegative Matrix Factorization Methods for
+Clustering. In Proceedings of the 6th International
+Conference on Data Mining (ICDM). 2006.
+[16] X. Liu and Y. Gong. Document Clustering with
+Cluster Refinement and Model Selection Capabilities.
+In Proc. of the International ACM SIGIR Conference
+on Research and Development in Information
+Retrieval, 2002.
+[17] E. Han, D. Boley, M. Gini, R. Gross, K. Hastings, G.
+Karypis, V. Kumar, B. Mobasher, and J. Moore.
+WebACE: A Web Agent for Document Categorization
+and Exploration. In Proceedings of the 2nd
+International Conference on Autonomous Agents
+(Agents98). ACM Press, 1998.
+[18] M. Hein, J. Y. Audibert, and U. von Luxburg. From
+Graphs to Manifolds - Weak and Strong Pointwise
+Consistency of Graph Laplacians. In Proceedings of
+the 18th Conference on Learning Theory (COLT),
+470-485. 2005.
+[19] J. He, M. Lan, C.-L. Tan, S.-Y. Sung, and H.-B. Low.
+Initialization of Cluster Refinement Algorithms: A
+Review and Comparative Study. In Proc. of Inter.
+Joint Conference on Neural Networks, 2004.
+[20] A. Y. Ng, M. I. Jordan, Y. Weiss. On Spectral
+Clustering: Analysis and an algorithm. In Advances in
+Neural Information Processing Systems 14. 2002.
+[21] B. Sch¨olkopf and A. Smola. Learning with Kernels.
+The MIT Press. Cambridge, Massachusetts. 2002.
+[22] J. Shi and J. Malik. Normalized Cuts and Image
+Segmentation. IEEE Trans. on Pattern Analysis and
+Machine Intelligence, 22(8):888-905, 2000.
+[23] A. Strehl and J. Ghosh. Cluster Ensembles - A
+Knowledge Reuse Framework for Combining Multiple
+Partitions. Journal of Machine Learning Research,
+3:583-617, 2002.
+[24] V. N. Vapnik. The Nature of Statistical Learning
+Theory. Berlin: Springer-Verlag, 1995.
+[25] Wu, M. and Sch¨olkopf, B. A Local Learning Approach
+for Clustering. In Advances in Neural Information
+Processing Systems 18. 2006.
+[26] S. X. Yu, J. Shi. Multiclass Spectral Clustering. In
+Proceedings of the International Conference on
+Computer Vision, 2003.
+[27] W. Xu, X. Liu and Y. Gong. Document Clustering
+Based On Non-Negative Matrix Factorization. In
+Proceedings of the International ACM SIGIR
+Conference on Research and Development in
+Information Retrieval, 2003.
+[28] H. Zha, X. He, C. Ding, M. Gu and H. Simon. Spectral
+Relaxation for K-means Clustering. In NIPS 14. 2001.
+[29] T. Zhang and F. J. Oles. Text Categorization Based
+on Regularized Linear Classification Methods. Journal
+of Information Retrieval, 4:5-31, 2001.
+[30] L. Zelnik-Manor and P. Perona. Self-Tuning Spectral
+Clustering. In NIPS 17. 2005.
+[31] D. Zhou, O. Bousquet, T. N. Lal, J. Weston and B.
+Sch¨olkopf. Learning with Local and Global
+Consistency. NIPS 17, 2005.
