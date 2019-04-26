@@ -12,6 +12,7 @@
 
 
 import os
+import argparse
 from nltk.tokenize import sent_tokenize
 
 parser = argparse.ArgumentParser(description='BERT Keyword Extraction Model')
