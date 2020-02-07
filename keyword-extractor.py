@@ -1,6 +1,9 @@
 from pytorch_pretrained_bert import BertTokenizer, BertConfig
 from pytorch_pretrained_bert import BertForTokenClassification, BertAdam
 import torch
+import argparse
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 parser = argparse.ArgumentParser(description='BERT Keyword Extractor')
 parser.add_argument('--sentence', type=str, default=' ',
