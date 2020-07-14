@@ -200,8 +200,12 @@ for _ in trange(epochs, desc="Epoch"):
         batch = tuple(t.to(device) for t in batch)
         b_input_ids, b_input_mask, b_labels = batch
         # forward pass
+        b_input_ids = b_input_ids.type(torch.LongTensor)
+        b_input_mask = b_input_mask.type(torch.LongTensor)
+        b_labels = b_labels.type(torch.LongTensor)
+        
         loss = model(b_input_ids, token_type_ids=None,
-                     attention_mask=b_input_mask, labels=b_labels)
+                     attention_mask=torch.LongTensor(b_input_mask), labels=torch.LongTensor(b_labels))
         # backward pass
         loss.backward()
         # track train loss
@@ -225,6 +229,10 @@ for _ in trange(epochs, desc="Epoch"):
         b_input_ids, b_input_mask, b_labels = batch
         
         with torch.no_grad():
+            b_input_ids = b_input_ids.type(torch.LongTensor)
+            b_input_mask = b_input_mask.type(torch.LongTensor)
+            b_labels = b_labels.type(torch.LongTensor)
+            
             tmp_eval_loss = model(b_input_ids, token_type_ids=None,
                                   attention_mask=b_input_mask, labels=b_labels)
             logits = model(b_input_ids, token_type_ids=None,
