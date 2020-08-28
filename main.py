@@ -52,24 +52,114 @@ def convert(key):
     keys = [line.strip() for line in key_file]
     key_sent = []
     labels = []
+
     for token in tokens:
+        
+        for word in token.split():
+            
+            if word.lower() in limits:
+                token = token.replace(word, limits[word.lower()])
+             
+        punctuations = '''!()-[]{};:\,<>'"./?@#$%^&*_~'''
+
+ 
+
+        no_punct = ""
+        for char in token:
+            if char not in punctuations:
+                no_punct = no_punct + char
+        
+
+        
+        token=no_punct
+       
         z = ['O'] * len(token.split())
         for k in keys:
-            if k in token:
-                
+
+            if k in token.lower():
+
                 if len(k.split())==1:
                     try:
+                        
                         z[token.lower().split().index(k.lower().split()[0])] = 'B'
+
                     except ValueError:
                         continue
+                        
+                    
                 elif len(k.split())>1:
+
                     try:
-                        if token.lower().split().index(k.lower().split()[0]) and token.lower().split().index(k.lower().split()[-1]):
-                            z[token.lower().split().index(k.lower().split()[0])] = 'B'
-                            for j in range(1, len(k.split())):
-                                z[token.lower().split().index(k.lower().split()[j])] = 'I'
-                    except ValueError:
+                        h = k.split()
+                        def index(arr, num):
+                            a = []
+                            for i, x in enumerate(arr):
+                                if x == num:
+                                    a.append(i)
+                            return(a)
+
+                     
+                            
+                            
+                        lis1 = index(token.lower().split(),k.lower().split()[0])
+                        lis2 =  index(token.lower().split(),k.lower().split()[1])
+                        x = []
+                        for i in lis1:
+                            for j in lis2:
+                                if abs(i - j) == 1:
+                                    x.append(i)
+                        num = x[0]  
+                        z[num] = 'B'
+                        
+                        for j in range(1, len(h)):
+                            z[num + j] = 'I'
+                            
+                    except:
                         continue
+                     
+            elif k.lower().split()[0] in token.lower():
+                
+                    try:
+                        h = k.split()
+#                         print(token)
+#                         print(len(token.split()))
+                        def index(arr, num):
+                            a = []
+                            for i, x in enumerate(arr):
+                                if x == num:
+                                    a.append(i)
+                            return(a)
+
+                     
+                            
+                            
+                        lis1 = index(token.lower().split(),k.lower().split()[0])
+                        lis2 =  index(token.lower().split(),k.lower().split()[1])
+                        x = []
+                        for i in lis1:
+                            for j in lis2:
+                                if abs(i - j) == 1:
+                                    x.append(i)
+                                    
+                        num = x[0]  
+                        z[num] = 'B'
+                        p= len(h)-1
+                        y=0
+                        for j in range(1,len(token.split())):
+                            if (k.lower().split()[j] in token.lower().split()):
+#                                 print('rahul')
+                                print(j)
+                                z[num + j] = 'I'
+                                print(k.lower().split()[j])
+                                y+=1
+                                if y==p:
+                                  break
+                            else:
+                                continue
+                            
+                    except:
+                        continue      
+        
         for m, n in enumerate(z):
             if z[m] == 'I' and z[m-1] == 'O':
                 z[m] = 'O'
