@@ -14,6 +14,8 @@
 import os
 import argparse
 from nltk.tokenize import sent_tokenize
+import abbreviation
+from abbreviation import limits
 
 parser = argparse.ArgumentParser(description='BERT Keyword Extraction Model')
 
