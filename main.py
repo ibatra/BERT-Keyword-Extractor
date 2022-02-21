@@ -47,10 +47,10 @@ for i, k in enumerate(txt):
 
 def convert(key):
     sentences = ""
-    for line in open(train_path + "/" + filekey[key], 'r'):
+    for line in open(train_path + "/" + filekey[key], 'r', encoding = 'utf-8'):
         sentences += (" " + line.rstrip())
     tokens = sent_tokenize(sentences)
-    key_file = open(train_path + "/" + str(key),'r')
+    key_file = open(train_path + "/" + str(key),'r', encoding = 'utf-8')
     keys = [line.strip() for line in key_file]
     key_sent = []
     labels = []
